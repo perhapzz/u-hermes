@@ -73,8 +73,17 @@ if errorlevel 1 (
 )
 
 echo     Extracting...
-tar -xzf "%TMP_FILE%" -C "%PYTHON_DIR%" --strip-components=1
+tar -xzf "%TMP_FILE%" -C "%PYTHON_DIR%"
 del /f /q "%TMP_FILE%" 2>nul
+
+REM Handle nested python/ directory from tar extraction
+if not exist "%PYTHON_BIN%" (
+    if exist "%PYTHON_DIR%\python\python.exe" (
+        echo     Fixing directory structure...
+        xcopy /s /e /q /y "%PYTHON_DIR%\python\*" "%PYTHON_DIR%\" >nul
+        rmdir /s /q "%PYTHON_DIR%\python" 2>nul
+    )
+)
 
 if not exist "%PYTHON_BIN%" (
     echo   [ERROR] Python extraction failed
