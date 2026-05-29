@@ -45,17 +45,11 @@ if errorlevel 1 (
     echo   Falling back to pip install...
     echo.
     if not exist "%PACKAGES_DIR%" mkdir "%PACKAGES_DIR%" 2>nul
-    set "PIP_EXTRA="
-    curl -s --max-time 3 -o nul "https://pypi.tuna.tsinghua.edu.cn/" >nul 2>&1
-    if not errorlevel 1 (
-        curl -s --max-time 3 -o nul "https://pypi.org/" >nul 2>&1
-        if errorlevel 1 set "PIP_EXTRA=-i https://pypi.tuna.tsinghua.edu.cn/simple"
-    )
     "%PYTHON_BIN%" -m pip install "%UHERMES_DIR%agent" ^
-        --target "%PACKAGES_DIR%" --no-user --disable-pip-version-check !PIP_EXTRA!
+        --target "%PACKAGES_DIR%" --no-user --disable-pip-version-check
     if exist "%WEBUI_DIR%\requirements.txt" (
         "%PYTHON_BIN%" -m pip install -r "%WEBUI_DIR%\requirements.txt" ^
-            --target "%PACKAGES_DIR%" --no-user --disable-pip-version-check !PIP_EXTRA!
+            --target "%PACKAGES_DIR%" --no-user --disable-pip-version-check
     )
     echo   [OK] Dependencies installed
     echo.

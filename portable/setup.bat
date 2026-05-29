@@ -25,15 +25,13 @@ echo   System: Windows x64
 REM ---- Detect China network ----
 set "IN_CHINA=false"
 curl -s --max-time 3 -o nul "https://pypi.tuna.tsinghua.edu.cn/" >nul 2>&1
-if not errorlevel 1 (
-    curl -s --max-time 3 -o nul "https://github.com/" >nul 2>&1
-    if errorlevel 1 (
-        set "IN_CHINA=true"
-    )
-)
+if errorlevel 1 goto china_done
+curl -s --max-time 3 -o nul "https://github.com/" >nul 2>&1
+if errorlevel 1 set "IN_CHINA=true"
+:china_done
 
 if "%IN_CHINA%"=="true" (
-    echo   Network: China (using mirrors)
+    echo   Network: China ^(using mirrors^)
 ) else (
     echo   Network: Direct
 )
@@ -56,21 +54,21 @@ if not exist "%PYTHON_DIR%" mkdir "%PYTHON_DIR%" 2>nul
 
 set "TMP_FILE=%TEMP%\uhermes-python-%RANDOM%.tar.gz"
 
-if "%IN_CHINA%"=="true" (
-    echo     Trying ghfast.top mirror...
-    curl -fSL --max-time 300 "%GH_ACCEL%%GH_RAW%%PY_RELEASE%" -o "%TMP_FILE%" >nul 2>&1
-    if errorlevel 1 (
-        echo     Mirror failed, trying direct...
-        curl -fSL "%GH_RAW%%PY_RELEASE%" -o "%TMP_FILE%"
-    )
-) else (
-    curl -fSL "%GH_RAW%%PY_RELEASE%" -o "%TMP_FILE%"
-)
+if not "%IN_CHINA%"=="true" goto download_direct
+echo     Trying ghfast.top mirror...
+curl -fSL --max-time 300 "%GH_ACCEL%%GH_RAW%%PY_RELEASE%" -o "%TMP_FILE%" >nul 2>&1
+if not errorlevel 1 goto download_ok
+echo     Mirror failed, trying direct...
+
+:download_direct
+curl -fSL "%GH_RAW%%PY_RELEASE%" -o "%TMP_FILE%"
 if errorlevel 1 (
     echo   [ERROR] Python download failed
     pause
     exit /b 1
 )
+
+:download_ok
 
 echo     Extracting...
 tar -xzf "%TMP_FILE%" -C "%PYTHON_DIR%"
@@ -105,13 +103,11 @@ if not errorlevel 1 (
 echo   [DOWNLOAD] Installing hermes-agent...
 if not exist "%PACKAGES_DIR%" mkdir "%PACKAGES_DIR%" 2>nul
 
-if "%IN_CHINA%"=="true" (
-    "%PYTHON_BIN%" -m pip install "%SCRIPT_DIR%agent" ^
-        --target "%PACKAGES_DIR%" --no-user --disable-pip-version-check --quiet -i "%PIP_MIRROR%"
-) else (
-    "%PYTHON_BIN%" -m pip install "%SCRIPT_DIR%agent" ^
-        --target "%PACKAGES_DIR%" --no-user --disable-pip-version-check --quiet
-)
+set "PIP_INDEX="
+if "%IN_CHINA%"=="true" set "PIP_INDEX=-i %PIP_MIRROR%"
+
+"%PYTHON_BIN%" -m pip install "%SCRIPT_DIR%agent" ^
+    --target "%PACKAGES_DIR%" --no-user --disable-pip-version-check --quiet %PIP_INDEX%
 if errorlevel 1 (
     echo   [ERROR] hermes-agent install failed
     pause
@@ -125,13 +121,8 @@ REM ---- 3. Install webui dependencies ----
 set "WEBUI_REQS=%SCRIPT_DIR%webui\requirements.txt"
 if exist "%WEBUI_REQS%" (
     echo   [DOWNLOAD] Installing webui dependencies...
-    if "%IN_CHINA%"=="true" (
-        "%PYTHON_BIN%" -m pip install -r "%WEBUI_REQS%" ^
-            --target "%PACKAGES_DIR%" --no-user --disable-pip-version-check --quiet -i "%PIP_MIRROR%"
-    ) else (
-        "%PYTHON_BIN%" -m pip install -r "%WEBUI_REQS%" ^
-            --target "%PACKAGES_DIR%" --no-user --disable-pip-version-check --quiet
-    )
+    "%PYTHON_BIN%" -m pip install -r "%WEBUI_REQS%" ^
+        --target "%PACKAGES_DIR%" --no-user --disable-pip-version-check --quiet %PIP_INDEX%
     echo   [OK] webui deps installed
 )
 
