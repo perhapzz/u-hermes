@@ -9,17 +9,13 @@
 ```bash
 # 1. 克隆
 git clone <this-repo> u-hermes
-
-# 2. 安装依赖（下载 standalone Python + hermes-agent，无需系统 Python）
 cd u-hermes
-bash setup.sh           # Mac
-# 或双击 setup.bat      # Windows
 
-# 3. 启动
-bash Mac-Start.command   # Mac
-# 或双击 Windows-Start.bat  # Windows
+# 2. 启动（首次自动下载 standalone Python + hermes-agent，之后秒开）
+bash Start.command       # Mac（也可双击）
+# 或双击 Start.bat       # Windows
 
-# 4. 拷贝到 U 盘（整个 u-hermes 目录就是 U 盘内容）
+# 3. 拷贝到 U 盘（整个 u-hermes 目录就是 U 盘内容）
 cp -R . /Volumes/YOUR_USB/U-Hermes/
 ```
 
@@ -27,9 +23,8 @@ cp -R . /Volumes/YOUR_USB/U-Hermes/
 
 ```
 u-hermes/                       # = U 盘根目录
-├── setup.sh / setup.bat       # 一键搭建：下载 Python 运行时 + hermes-agent
-├── Mac-Start.command          # macOS 双击启动
-├── Windows-Start.bat          # Windows 双击启动
+├── Start.command              # macOS 双击启动（首次自动 setup）
+├── Start.bat                  # Windows 双击启动（首次自动 setup）
 └── portable/                   # USB 骨架内部细节
     ├── webui/                 # Web UI 源码（在 repo 里）
     │   ├── server.py, bootstrap.py
@@ -50,9 +45,9 @@ u-hermes/                       # = U 盘根目录
 
 | 功能 | Mac (ARM64) | Mac (x64) | Windows x64 |
 |------|-------------|-----------|-------------|
-| **免安装运行** | `Mac-Start.command` | `Mac-Start.command` | `Windows-Start.bat` |
-| **搭建** | `bash setup.sh` | `bash setup.sh` | `setup.bat` |
-| **跨平台 U 盘** | `bash setup.sh --all-platforms` | — | — |
+| **一键启动** | `Start.command` | `Start.command` | `Start.bat` |
+
+> 首次启动会自动下载 Python 运行时和依赖；之后所有运行都是直接启动。
 
 ## 设计原则
 
