@@ -12,7 +12,10 @@ import sys
 import time
 import urllib.error
 import urllib.request
-import venv
+try:
+    import venv
+except ModuleNotFoundError:
+    venv = None  # type: ignore[assignment]  # Embeddable Python lacks venv
 import webbrowser
 from pathlib import Path
 
@@ -91,11 +94,8 @@ def is_wsl() -> bool:
 
 
 def ensure_supported_platform() -> None:
-    if platform.system() == "Windows" and not is_wsl():
-        raise RuntimeError(
-            "Native Windows is not supported for this bootstrap yet. "
-            "Please run it from Linux, macOS, or inside WSL2."
-        )
+    # Portable mode supports Windows natively; skip platform check.
+    pass
 
 
 def _agent_dir_from_hermes_cli() -> Path | None:
@@ -237,6 +237,11 @@ def ensure_python_has_webui_deps(python_exe: str, agent_dir: Path | None = None)
         # CPython's venv falls back to copy mode automatically when symlink
         # creation fails (e.g. older Windows without SeCreateSymbolicLinkPrivilege),
         # so this is safe to set unconditionally.
+        if venv is None:
+            raise RuntimeError(
+                "Cannot create virtualenv: 'venv' module is not available in this Python. "
+                "Set HERMES_WEBUI_PYTHON to a full Python installation or pre-install dependencies."
+            )
         venv.EnvBuilder(with_pip=True, symlinks=True).create(venv_dir)
 
     info("Installing WebUI dependencies into local virtualenv")
@@ -415,7 +420,7 @@ def main() -> int:
     if agent_dir:
         os.environ["HERMES_WEBUI_AGENT_DIR"] = str(agent_dir)
 
-    server_cwd = str(agent_dir or REPO_ROOT)
+    server_cwd = str(REPO_ROOT)
     server_path = str(REPO_ROOT / "server.py")
 
     # --foreground (or auto-detected supervisor): replace this process with the

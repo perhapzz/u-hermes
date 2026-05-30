@@ -880,7 +880,28 @@ def get_onboarding_status() -> dict:
     runtime = _status_from_runtime(cfg, imports_ok)
     workspaces = load_workspaces()
     last_workspace = get_last_workspace()
-    available_models = get_available_models()
+
+    # get_available_models() may block for 60-90s on first run when external
+    # APIs are unreachable (DNS resolution on Windows does not respect socket
+    # timeouts). Use a thread with a hard deadline so the onboarding page loads
+    # promptly; the picker can refresh models later via /api/models.
+    import threading as _threading
+    _models_result = [None]
+    def _fetch_models():
+        try:
+            _models_result[0] = get_available_models()
+        except Exception:
+            pass
+    _t = _threading.Thread(target=_fetch_models, daemon=True)
+    _t.start()
+    _t.join(timeout=5.0)
+    available_models = _models_result[0] or {
+        "active_provider": None,
+        "default_model": "",
+        "configured_model_badges": {},
+        "groups": [],
+        "aliases": {},
+    }
 
     # HERMES_WEBUI_SKIP_ONBOARDING=1 lets hosting providers (e.g. Agent37) ship
     # a pre-configured instance without the wizard blocking the first load.

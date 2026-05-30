@@ -708,6 +708,7 @@ _FALLBACK_MODELS = [
 
 # Provider display names for known Hermes provider IDs
 _PROVIDER_DISPLAY = {
+    "perhapz": "Perhapz (U-Hermes)",
     "nous": "Nous Portal",
     "openrouter": "OpenRouter",
     "anthropic": "Anthropic",

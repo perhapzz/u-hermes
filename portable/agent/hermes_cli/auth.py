@@ -204,6 +204,13 @@ PROVIDER_REGISTRY: Dict[str, ProviderConfig] = {
         api_key_env_vars=("OPENAI_API_KEY",),
         base_url_env_var="OPENAI_BASE_URL",
     ),
+    "perhapz": ProviderConfig(
+        id="perhapz",
+        name="Perhapz (U-Hermes)",
+        auth_type="api_key",
+        inference_base_url="https://perhapz.top/v1",
+        api_key_env_vars=("OPENAI_API_KEY",),
+    ),
     "xai-oauth": ProviderConfig(
         id="xai-oauth",
         name="xAI Grok OAuth (SuperGrok / Premium+)",

@@ -1832,7 +1832,7 @@ def _resolve_compatible_session_model_state(
         for bare_prefix in ("gpt", "claude", "gemini"):
             if model_lower.startswith(bare_prefix):
                 model_provider = _normalize_provider_id(bare_prefix)
-                if model_provider and model_provider != active_provider and default_model:
+                if model_provider and active_provider and model_provider != active_provider and default_model:
                     provider_context = (
                         raw_active_provider
                         if _should_attach_codex_provider_context(default_model, raw_active_provider, catalog)
@@ -5334,6 +5334,12 @@ def handle_post(handler, parsed) -> bool:
             return bad(handler, str(e))
         except RuntimeError as e:
             return bad(handler, str(e), 500)
+
+    if parsed.path == "/api/models/refresh":
+        from api.config import invalidate_models_cache
+        provider_id = (body.get("provider") or "").strip() if body else ""
+        invalidate_models_cache()
+        return j(handler, {"ok": True, "provider": provider_id or None})
 
     # ── Auxiliary model set (POST) ──
     if parsed.path == "/api/model/set":

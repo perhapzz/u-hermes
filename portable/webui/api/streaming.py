@@ -4527,6 +4527,7 @@ def _run_agent_streaming(
                 model_with_provider_context(model, provider_context)
             )
 
+
             # Resolve API key via Hermes runtime provider (matches gateway behaviour).
             # Pass the resolved provider so non-default providers get their own credentials.
             resolved_api_key = None
