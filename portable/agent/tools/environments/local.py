@@ -246,10 +246,12 @@ def _find_bash() -> str:
             if os.path.isfile(candidate):
                 return candidate
 
-    found = shutil.which("bash")
-    if found:
-        return found
-
+    # Try common Git for Windows install locations BEFORE shutil.which —
+    # because on Windows `which bash` often returns C:\Windows\System32\bash.exe
+    # (the WSL launcher stub) or %LOCALAPPDATA%\Microsoft\WindowsApps\bash.exe
+    # (the Store-app WSL stub). Both are NOT real bash; they invoke WSL which
+    # may be broken (proxy config, no distro installed, etc.) and will fail
+    # every shell command hermes runs.
     for candidate in (
         os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "Git", "bin", "bash.exe"),
         os.path.join(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"), "Git", "bin", "bash.exe"),
@@ -257,6 +259,17 @@ def _find_bash() -> str:
     ):
         if candidate and os.path.isfile(candidate):
             return candidate
+
+    # Last resort: shutil.which, but reject known WSL stubs.
+    found = shutil.which("bash")
+    if found:
+        found_lower = found.lower()
+        _is_wsl_stub = (
+            found_lower.endswith(r"\system32\bash.exe")
+            or r"\windowsapps\bash.exe" in found_lower
+        )
+        if not _is_wsl_stub:
+            return found
 
     raise RuntimeError(
         "Git Bash not found. Hermes Agent requires Git for Windows on Windows.\n"

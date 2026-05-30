@@ -59,6 +59,31 @@ REM ---- 2. Init data directories ----
 if not exist "%HERMES_HOME%" mkdir "%HERMES_HOME%" 2>nul
 if not exist "%DATA_DIR%\logs" mkdir "%DATA_DIR%\logs" 2>nul
 
+REM ---- 2a. Detect drive-letter / path change since last run ----
+REM    USB drives get different letters on different machines (D:, F:, G: ...).
+REM    State files in data\.hermes may cache absolute paths from the previous
+REM    run; if the path changed, archive the old state so the agent starts
+REM    fresh instead of dereferencing dead paths.
+set "PATH_MARKER=%HERMES_HOME%\.last_path"
+set "LAST_PATH="
+if exist "%PATH_MARKER%" set /p LAST_PATH=<"%PATH_MARKER%"
+
+REM Compare outside the if-block so the variable is actually expanded.
+if defined LAST_PATH if /i not "%LAST_PATH%"=="%UHERMES_DIR%" (
+    echo   [INFO] USB path changed since last run:
+    echo          old: %LAST_PATH%
+    echo          new: %UHERMES_DIR%
+    echo   Archiving old state to data\.hermes.bak ...
+    if exist "%DATA_DIR%\.hermes.bak" rmdir /s /q "%DATA_DIR%\.hermes.bak" 2>nul
+    move /y "%HERMES_HOME%" "%DATA_DIR%\.hermes.bak" >nul 2>&1
+    mkdir "%HERMES_HOME%" 2>nul
+    echo   [OK] Fresh state directory created.
+    echo.
+)
+
+REM Write current path marker for next run.
+>"%PATH_MARKER%" echo %UHERMES_DIR%
+
 REM ---- 2b. Bootstrap API key (device fingerprint) ----
 echo   Binding device fingerprint...
 "%PYTHON_BIN%" "%UHERMES_DIR%lib\bootstrap-api.py" "%HERMES_HOME%" 2>nul
@@ -70,54 +95,26 @@ set "HERMES_WEBUI_STATE_DIR=%HERMES_HOME%\webui"
 set "HERMES_WEBUI_HOST=127.0.0.1"
 set "HERMES_WEBUI_AGENT_DIR=%UHERMES_DIR%agent"
 set "HERMES_WEBUI_PYTHON=%PYTHON_BIN%"
-set "PYTHONPATH=%PACKAGES_DIR%;%UHERMES_DIR%agent"
-set "PATH=%PYTHON_DIR%;%PYTHON_DIR%\Scripts;%PATH%"
+set "HERMES_DISABLE_LAZY_INSTALLS=1"
 
-REM ---- 4. Find available port ----
-set PORT=8787
+REM ---- 3b. Portable workspace (USB-relative, no user home dependency) ----
+set "HERMES_WEBUI_DEFAULT_WORKSPACE=%UHERMES_DIR%workspace"
+if not exist "%HERMES_WEBUI_DEFAULT_WORKSPACE%" mkdir "%HERMES_WEBUI_DEFAULT_WORKSPACE%" 2>nul
 
-:find_port
-netstat -an 2>nul | findstr ":%PORT% " >nul 2>&1
-if not errorlevel 1 (
-    echo   Port %PORT% in use, trying next...
-    set /a PORT+=1
-    if %PORT% gtr 8799 (
-        echo   [ERROR] No available port (8787-8799)
-        pause
-        exit /b 1
-    )
-    goto find_port
-)
-
-set "HERMES_WEBUI_PORT=%PORT%"
+REM ---- 4. Set port ----
+set "HERMES_WEBUI_PORT=8787"
 
 REM ---- 5. Start webui ----
-echo   Starting Hermes on port %PORT%...
+echo   Starting Hermes on port 8787...
+echo   Open in browser: http://127.0.0.1:8787/
+echo.
+echo   ========================================
+echo   Close this window to stop the server.
+echo   ========================================
 echo.
 
 cd /d "%WEBUI_DIR%"
-start "" "%PYTHON_BIN%" bootstrap.py --no-browser --skip-agent-install %PORT%
-
-REM ---- 6. Wait for server, then open browser ----
-set TRIES=0
-:wait_loop
-timeout /t 1 /nobreak >nul
-set /a TRIES+=1
-curl -s -o nul "http://127.0.0.1:%PORT%/" >nul 2>&1
-if not errorlevel 1 (
-    start http://127.0.0.1:%PORT%/
-    goto server_ready
-)
-if %TRIES% lss 30 goto wait_loop
-
-:server_ready
+"%PYTHON_BIN%" server.py
 echo.
-echo   ========================================
-echo   U-Hermes is running!
-echo     Web UI: http://127.0.0.1:%PORT%/
-echo.
-echo   Close this window to stop.
-echo   ========================================
-echo.
+echo   Server stopped.
 pause
-taskkill /f /im python.exe /fi "WINDOWTITLE eq U-Hermes*" >nul 2>&1

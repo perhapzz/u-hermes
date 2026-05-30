@@ -94,6 +94,28 @@ echo ""
 # ---- 4. Init data directories ----
 mkdir -p "$HERMES_HOME" "$DATA_DIR/logs"
 
+# ---- 4a. Detect mount-path change since last run ----
+#    USB sticks mount at varying paths (/Volumes/USB1, /Volumes/Untitled, ...).
+#    State files in data/.hermes may cache absolute paths from the previous
+#    run; if the path changed, archive the old state so the agent starts
+#    fresh instead of dereferencing dead paths.
+PATH_MARKER="$HERMES_HOME/.last_path"
+if [ -f "$PATH_MARKER" ]; then
+    LAST_PATH=$(cat "$PATH_MARKER" 2>/dev/null)
+    if [ -n "$LAST_PATH" ] && [ "$LAST_PATH" != "$UHERMES_DIR" ]; then
+        echo -e "  ${YELLOW}[INFO] USB path changed since last run:${NC}"
+        echo "         old: $LAST_PATH"
+        echo "         new: $UHERMES_DIR"
+        echo -e "  ${CYAN}Archiving old state to data/.hermes.bak ...${NC}"
+        rm -rf "$DATA_DIR/.hermes.bak" 2>/dev/null
+        mv "$HERMES_HOME" "$DATA_DIR/.hermes.bak" 2>/dev/null
+        mkdir -p "$HERMES_HOME"
+        echo -e "  ${GREEN}[OK] Fresh state directory created.${NC}"
+        echo ""
+    fi
+fi
+echo "$UHERMES_DIR" > "$PATH_MARKER"
+
 # ---- 4b. Bootstrap API key (device fingerprint → .env) ----
 echo -e "  ${CYAN}Binding device fingerprint...${NC}"
 "$PYTHON_BIN" "$UHERMES_DIR/lib/bootstrap-api.py" "$HERMES_HOME" || true
@@ -107,6 +129,10 @@ export HERMES_WEBUI_AGENT_DIR="$UHERMES_DIR/agent"
 export HERMES_WEBUI_PYTHON="$PYTHON_BIN"
 export PYTHONPATH="$PACKAGES_DIR:$UHERMES_DIR/agent${PYTHONPATH:+:$PYTHONPATH}"
 export PATH="$PYTHON_DIR/bin:$PATH"
+
+# ---- 5b. Portable workspace (USB-relative, no user home dependency) ----
+export HERMES_WEBUI_DEFAULT_WORKSPACE="$UHERMES_DIR/workspace"
+mkdir -p "$HERMES_WEBUI_DEFAULT_WORKSPACE"
 
 # ---- 6. Find available port ----
 PORT=${HERMES_WEBUI_PORT:-8787}
