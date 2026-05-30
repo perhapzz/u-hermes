@@ -8,7 +8,14 @@ echo     U-Hermes v0.1 - Portable AI Agent
 echo   ========================================
 echo.
 
-set "UHERMES_DIR=%~dp0"
+REM Launcher lives at repo root; the portable USB skeleton is in portable\.
+set "UHERMES_DIR=%~dp0portable\"
+if not exist "%UHERMES_DIR%" (
+    echo   [ERROR] portable\ directory not found next to this launcher.
+    echo   Expected: %UHERMES_DIR%
+    pause
+    exit /b 1
+)
 set "APP_DIR=%UHERMES_DIR%app"
 set "RUNTIME_DIR=%APP_DIR%\runtime"
 set "PACKAGES_DIR=%APP_DIR%\packages"

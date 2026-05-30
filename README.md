@@ -11,7 +11,7 @@
 git clone <this-repo> u-hermes
 
 # 2. 安装依赖（下载 standalone Python + hermes-agent，无需系统 Python）
-cd u-hermes/portable
+cd u-hermes
 bash setup.sh           # Mac
 # 或双击 setup.bat      # Windows
 
@@ -19,29 +19,31 @@ bash setup.sh           # Mac
 bash Mac-Start.command   # Mac
 # 或双击 Windows-Start.bat  # Windows
 
-# 4. 拷贝到 U 盘
-cp -R portable/ /Volumes/YOUR_USB/U-Hermes/
+# 4. 拷贝到 U 盘（整个 u-hermes 目录就是 U 盘内容）
+cp -R . /Volumes/YOUR_USB/U-Hermes/
 ```
 
 ## 文件结构
 
 ```
-portable/
+u-hermes/                       # = U 盘根目录
 ├── setup.sh / setup.bat       # 一键搭建：下载 Python 运行时 + hermes-agent
 ├── Mac-Start.command          # macOS 双击启动
 ├── Windows-Start.bat          # Windows 双击启动
-├── webui/                     # Web UI 源码（在 repo 里）
-│   ├── server.py, bootstrap.py
-│   ├── api/
-│   └── static/
-├── app/                       # setup 下载的内容（不在 git 里）
-│   ├── runtime/
-│   │   ├── python-mac-arm64/  # Standalone Python (Mac ARM64)
-│   │   ├── python-mac-x64/    # Standalone Python (Mac Intel)
-│   │   └── python-win-x64/   # Standalone Python (Windows)
-│   └── packages/              # hermes-agent + pip 依赖 (--target)
-└── data/
-    └── .hermes/               # 运行时数据
+└── portable/                   # USB 骨架内部细节
+    ├── webui/                 # Web UI 源码（在 repo 里）
+    │   ├── server.py, bootstrap.py
+    │   ├── api/
+    │   └── static/
+    ├── agent/                 # hermes-agent 源码（在 repo 里）
+    ├── app/                   # setup 下载的内容（不在 git 里）
+    │   ├── runtime/
+    │   │   ├── python-mac-arm64/  # Standalone Python (Mac ARM64)
+    │   │   ├── python-mac-x64/    # Standalone Python (Mac Intel)
+    │   │   └── python-win-x64/    # Standalone Python (Windows)
+    │   └── packages/          # hermes-agent + pip 依赖 (--target)
+    └── data/
+        └── .hermes/           # 运行时数据
 ```
 
 ## 平台支持

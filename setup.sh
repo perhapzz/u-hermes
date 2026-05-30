@@ -10,7 +10,14 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Launcher lives at repo root; the portable USB skeleton is in portable/.
+_LAUNCHER_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$_LAUNCHER_DIR/portable"
+if [ ! -d "$SCRIPT_DIR" ]; then
+    echo "  [ERROR] portable/ directory not found next to this launcher."
+    echo "  Expected: $SCRIPT_DIR"
+    exit 1
+fi
 APP_DIR="$SCRIPT_DIR/app"
 RUNTIME_DIR="$APP_DIR/runtime"
 PACKAGES_DIR="$APP_DIR/packages"
