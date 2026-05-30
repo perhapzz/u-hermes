@@ -6,7 +6,7 @@
 
 ```
 代码库（git）= U 盘骨架（脚本 + webui 源码）
-     ↓ Start.command / Start.bat (首次自动 setup)
+     ↓ Mac-Start.command / Windows-Start.bat (首次自动 setup)
 完整文件夹 = U 盘内容（骨架 + Python 运行时 + hermes-agent）
      ↓ 拷贝到 U 盘
 U 盘 = 插上就能用
@@ -17,8 +17,8 @@ The repo is NOT a "build tool" — it IS the USB structure. The unified `Start.*
 ## Development Commands
 
 ```bash
-bash Start.command                  # Launch (macOS) — first run auto-installs
-# Or on Windows: double-click Start.bat
+bash Mac-Start.command                  # Launch (macOS) — first run auto-installs
+# Or on Windows: double-click Windows-Start.bat
 cp -R . /Volumes/USB/U-Hermes/      # Copy whole repo to USB
 ```
 
@@ -26,8 +26,8 @@ cp -R . /Volumes/USB/U-Hermes/      # Copy whole repo to USB
 
 ```
 u-hermes/                  ← USB root (launchers live here for user UX)
-  Start.command            ← Mac launcher (first run = setup + launch; later = launch)
-  Start.bat                ← Windows launcher (same all-in-one behavior)
+  Mac-Start.command            ← Mac launcher (first run = setup + launch; later = launch)
+  Windows-Start.bat                ← Windows launcher (same all-in-one behavior)
   portable/                ← USB skeleton internals (everything below)
     webui/                 ← Web UI source (IN REPO, from hermes-webui upstream)
       server.py, bootstrap.py, api/, static/
