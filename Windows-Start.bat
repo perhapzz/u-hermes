@@ -30,7 +30,7 @@ set "GIT_BASH=%GIT_DIR%\bin\bash.exe"
 
 set "PYTHON_TAG=20260510"
 set "PYTHON_VERSION=3.11.15"
-set "PYTHON_EMBED_VERSION=3.12.9"
+set "PYTHON_EMBED_VERSION=3.11.9"
 set "PYTHON_RELEASE_PATH=astral-sh/python-build-standalone/releases/download/%PYTHON_TAG%"
 set "PIP_MIRROR=https://pypi.tuna.tsinghua.edu.cn/simple"
 
@@ -205,7 +205,7 @@ REM ---- 2. Install hermes-agent ----
 "%PYTHON_BIN%" -c "import sys; sys.path.insert(0,r'%PACKAGES_DIR%'); import run_agent" >nul 2>&1
 if not errorlevel 1 goto agent_done
 
-echo   [DOWNLOAD] Installing hermes-agent...
+echo   [INSTALL] Installing hermes-agent from portable\agent (with PyPI deps)...
 if not exist "%PACKAGES_DIR%" mkdir "%PACKAGES_DIR%" 2>nul
 "%PYTHON_BIN%" -m pip install "%UHERMES_DIR%agent" ^
     --target "%PACKAGES_DIR%" --no-user --disable-pip-version-check --quiet %PIP_INDEX%
@@ -219,7 +219,7 @@ echo   [OK] hermes-agent installed
 REM ---- 3. Install webui dependencies ----
 set "WEBUI_REQS=%UHERMES_DIR%webui\requirements.txt"
 if exist "%WEBUI_REQS%" (
-    echo   [DOWNLOAD] Installing webui dependencies...
+    echo   [INSTALL] Installing webui PyPI dependencies...
     "%PYTHON_BIN%" -m pip install -r "%WEBUI_REQS%" ^
         --target "%PACKAGES_DIR%" --no-user --disable-pip-version-check --quiet %PIP_INDEX%
     echo   [OK] webui deps installed
@@ -228,7 +228,7 @@ if exist "%WEBUI_REQS%" (
 REM ---- 4. Install PortableGit (provides bash/grep/find/git for agent tools) ----
 if exist "%GIT_BASH%" goto git_done
 
-echo   [DOWNLOAD] Downloading PortableGit ^(~58 MB^)...
+echo   [DOWNLOAD] Downloading PortableGit ^(~58 MB, bundled bash/grep/git for agent^)...
 set "PG_VER=2.46.0"
 set "PG_TAG=v2.46.0.windows.1"
 set "PG_FILE=PortableGit-%PG_VER%-64-bit.7z.exe"

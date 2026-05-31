@@ -130,7 +130,7 @@ do_setup() {
 
     # ---- 2. Install hermes-agent ----
     if ! "$PYTHON_BIN" -c "import sys; sys.path.insert(0,'$PACKAGES_DIR'); import run_agent" 2>/dev/null; then
-        echo -e "  ${CYAN}↓${NC} Installing hermes-agent..."
+        echo -e "  ${CYAN}↓${NC} Installing hermes-agent from portable/agent (with PyPI deps)..."
         mkdir -p "$PACKAGES_DIR"
         pip_install_to_target "$UHERMES_DIR/agent"
         echo -e "  ${GREEN}✓${NC} hermes-agent installed"
@@ -138,7 +138,7 @@ do_setup() {
 
     # ---- 3. Install webui deps ----
     if [ -f "$WEBUI_DIR/requirements.txt" ]; then
-        echo -e "  ${CYAN}↓${NC} Installing webui dependencies..."
+        echo -e "  ${CYAN}↓${NC} Installing webui PyPI dependencies..."
         pip_install_to_target -r "$WEBUI_DIR/requirements.txt"
         echo -e "  ${GREEN}✓${NC} webui deps installed"
     fi
