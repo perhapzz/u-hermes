@@ -4081,6 +4081,16 @@ def handle_get(handler, parsed) -> bool:
         j(handler, dashboard_probe.get_dashboard_status())
         return True
 
+    if parsed.path == "/api/messaging-gateway":
+        try:
+            from api.messaging_gateway import get_messaging_gateway_config
+
+            j(handler, get_messaging_gateway_config())
+        except Exception as exc:
+            logger.exception("messaging_gateway GET failed")
+            bad(handler, str(exc), status=500)
+        return True
+
     if parsed.path == "/api/dashboard/config":
         from api import dashboard_probe
 
@@ -5204,6 +5214,30 @@ def handle_post(handler, parsed) -> bool:
             bad(handler, str(exc), status=400)
         except Exception as exc:
             logger.exception("dashboard config save failed")
+            bad(handler, str(exc), status=500)
+        return True
+
+    if parsed.path == "/api/messaging-gateway":
+        try:
+            from api.messaging_gateway import save_messaging_gateway_config
+
+            j(handler, save_messaging_gateway_config(body))
+        except ValueError as exc:
+            bad(handler, str(exc), status=400)
+        except Exception as exc:
+            logger.exception("messaging_gateway POST failed")
+            bad(handler, str(exc), status=500)
+        return True
+
+    if parsed.path == "/api/messaging-gateway/test-feishu":
+        try:
+            from api.messaging_gateway import test_feishu_connectivity
+
+            j(handler, test_feishu_connectivity(body))
+        except ValueError as exc:
+            bad(handler, str(exc), status=400)
+        except Exception as exc:
+            logger.exception("messaging_gateway test-feishu failed")
             bad(handler, str(exc), status=500)
         return True
 

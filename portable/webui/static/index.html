@@ -366,6 +366,10 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="8" rx="2"/><rect x="2" y="13" width="20" height="8" rx="2"/><line x1="6" y1="7" x2="6.01" y2="7"/><line x1="6" y1="17" x2="6.01" y2="17"/></svg>
           <span data-i18n="settings_tab_system">System</span>
         </button>
+        <button type="button" class="side-menu-item" data-settings-section="messaging" onclick="switchSettingsSection('messaging')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="13" y2="13"/></svg>
+          <span data-i18n="settings_section_messaging_gateway_title">Messaging Gateway</span>
+        </button>
       </div>
     </div>
   <div class="resize-handle" id="sidebarResize"></div>
@@ -1312,6 +1316,86 @@
             </div>
             <button class="sm-btn" onclick="saveSettings()" style="margin-top:12px;width:100%;padding:8px;font-weight:600" data-i18n="settings_save_btn">Save Settings</button>
           </div>
+          <div class="settings-pane" id="settingsPaneMessaging">
+            <div class="settings-section-head">
+              <div>
+                <div class="settings-section-title" data-i18n="settings_section_messaging_gateway_title">Messaging Gateway</div>
+                <div class="settings-section-meta" data-i18n="settings_section_messaging_gateway_meta">配置飞书 / 个人微信接入参数。保存后需重启 Gateway 才会生效：关闭 Start 启动窗口、确认后台 python.exe 都退出后，重新双击 Windows-Start.bat 或 Mac-Start.command。</div>
+              </div>
+            </div>
+            <div id="msgGwStatus" style="display:none;margin-bottom:12px;padding:10px 12px;font-size:12px;border-radius:6px;border:1px solid var(--border2);background:var(--code-bg)"></div>
+
+            <div style="margin-bottom:14px;padding:10px 12px;font-size:12px;border-radius:6px;border:1px solid var(--border2);background:var(--code-bg);color:var(--muted)">
+              模型提供商 / API Key 请在 <a href="javascript:void(0)" onclick="switchSettingsSection('providers')" style="color:var(--accent)">Providers</a> 标签里配置。这里只管平台（飞书 / 微信）的接入参数。
+            </div>
+
+            <!-- Feishu -->
+            <div class="settings-field" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
+              <label style="font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer">
+                <input type="checkbox" id="msgGwFeishuEnabled" style="margin:0">
+                <span>飞书 (Feishu)</span>
+              </label>
+              <div style="font-size:11px;color:var(--muted);margin:4px 0 8px">需要在飞书开放平台创建企业自建应用，取得 App ID / App Secret。WebSocket 模式不需要公网回调。</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <div>
+                  <div style="font-size:11px;color:var(--muted);margin-bottom:4px">App ID</div>
+                  <input type="text" id="msgGwFeishuAppId" placeholder="cli_xxxxxxxxxxxx" style="width:100%;padding:8px;background:var(--code-bg);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:13px">
+                </div>
+                <div>
+                  <div style="font-size:11px;color:var(--muted);margin-bottom:4px">连接模式</div>
+                  <select id="msgGwFeishuConnectionMode" style="width:100%;padding:8px;background:var(--code-bg);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:13px">
+                    <option value="websocket">websocket（推荐）</option>
+                    <option value="webhook">webhook</option>
+                  </select>
+                </div>
+              </div>
+              <div style="margin-top:8px">
+                <div style="font-size:11px;color:var(--muted);margin-bottom:4px">App Secret <span id="msgGwFeishuSecretHint" style="color:var(--muted)"></span></div>
+                <input type="password" id="msgGwFeishuAppSecret" placeholder="留空保持不变" autocomplete="new-password" style="width:100%;padding:8px;background:var(--code-bg);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:13px">
+              </div>
+              <div style="margin-top:8px">
+                <div style="font-size:11px;color:var(--muted);margin-bottom:4px">允许的用户 (FEISHU_ALLOWED_USERS, 逗号分隔的 open_id 前缀)</div>
+                <input type="text" id="msgGwFeishuAllowedUsers" placeholder="a2cfee6b,xxxx" style="width:100%;padding:8px;background:var(--code-bg);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:13px">
+              </div>
+              <div style="margin-top:8px">
+                <div style="font-size:11px;color:var(--muted);margin-bottom:4px">默认频道 (FEISHU_HOME_CHANNEL, 例如 oc_xxx)</div>
+                <input type="text" id="msgGwFeishuHomeChannel" placeholder="oc_03da1174d70c68d2..." style="width:100%;padding:8px;background:var(--code-bg);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:13px">
+              </div>
+              <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+                <button class="sm-btn" onclick="testFeishuConnectivity()" style="padding:8px 14px;font-weight:600" title="使用当前保存的 app_id/app_secret 直接调用飞书 OpenAPI，向 home_channel 或第一个允许用户发送一条测试消息">测试连通性</button>
+                <span style="font-size:11px;color:var(--muted)">会调用飞书 OpenAPI 发一条消息。修改后请先保存。</span>
+              </div>
+            </div>
+
+            <!-- Weixin -->
+            <div class="settings-field" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
+              <label style="font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer">
+                <input type="checkbox" id="msgGwWeixinEnabled" style="margin:0">
+                <span>个人微信 (Weixin)</span>
+              </label>
+              <div style="font-size:11px;color:var(--muted);margin:4px 0 8px">基于第三方桥（如 ilink/ipad 协议）。需要桥接服务的 base_url 和 token。</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <div>
+                  <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Account ID</div>
+                  <input type="text" id="msgGwWeixinAccountId" placeholder="wxid_xxxxxxxx" style="width:100%;padding:8px;background:var(--code-bg);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:13px">
+                </div>
+                <div>
+                  <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Bridge Base URL</div>
+                  <input type="text" id="msgGwWeixinBaseUrl" placeholder="http://127.0.0.1:8080" style="width:100%;padding:8px;background:var(--code-bg);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:13px">
+                </div>
+              </div>
+              <div style="margin-top:8px">
+                <div style="font-size:11px;color:var(--muted);margin-bottom:4px">允许的用户 (WEIXIN_ALLOWED_USERS, 逗号分隔)</div>
+                <input type="text" id="msgGwWeixinAllowedUsers" placeholder="wxid_xxx,wxid_yyy" style="width:100%;padding:8px;background:var(--code-bg);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:13px">
+              </div>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:18px">
+              <button class="sm-btn" onclick="saveMessagingGatewayConfig()" style="flex:1;padding:10px;font-weight:600;background:var(--accent);color:#fff;border:none">保存</button>
+              <button class="sm-btn" onclick="loadMessagingGatewayConfig()" style="padding:10px;font-weight:600">重新加载</button>
+            </div>
+            <div id="msgGwPaths" style="margin-top:12px;font-size:11px;color:var(--muted);font-family:'SF Mono',ui-monospace,monospace"></div>
+          </div>
       </div>
     </div>
   </main>
@@ -1411,6 +1495,7 @@
 <script src="static/messages.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/panels.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/onboarding.js?v=__WEBUI_VERSION__" defer></script>
+<script src="static/messaging_gateway.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/boot.js?v=__WEBUI_VERSION__" defer></script>
 
 <!-- Kanban: create/rename board modal — used for both flows. -->
