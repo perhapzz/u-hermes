@@ -135,31 +135,52 @@ def _write_env(env_path: Path, data: dict[str, str]) -> None:
 
 
 def bootstrap(hermes_home: Path) -> dict:
-    """Generate device-bound API key and write to .env if needed."""
+    """Generate device-bound API key and write to .env if needed.
+
+    Writes ``PERHAPZ_API_KEY`` (+ ``PERHAPZ_BASE_URL`` and
+    ``HERMES_DEFAULT_MODEL`` defaults) on first run. Older builds used
+    ``OPENAI_API_KEY`` / ``OPENAI_BASE_URL`` for the same purpose; those
+    stale entries are removed here when they match the fingerprint pattern
+    or our perhapz base URL so the Settings → Providers panel doesn't show
+    a phantom OpenAI key the user can't get rid of.
+    """
     env_path = hermes_home / ".env"
     env = _read_env(env_path)
 
     source, fingerprint = get_fingerprint(hermes_home.parent)
     api_key = f"sk-{fingerprint}"
 
-    existing_key = env.get("OPENAI_API_KEY", "").strip()
-    existing_url = env.get("OPENAI_BASE_URL", "").strip()
+    # ---- One-time migration: drop legacy OPENAI_* seeded by previous builds.
+    # Only purge values that look like our fingerprint key or perhapz base URL;
+    # if the user has their own real OpenAI creds we leave them alone.
+    changed = False
+    legacy_key = env.get("OPENAI_API_KEY", "").strip()
+    legacy_url = env.get("OPENAI_BASE_URL", "").strip()
+    if legacy_url == API_BASE_URL or (legacy_key.startswith("sk-") and len(legacy_key) == 67):
+        env.pop("OPENAI_API_KEY", None)
+        env.pop("OPENAI_BASE_URL", None)
+        changed = True
+
+    existing_key = env.get("PERHAPZ_API_KEY", "").strip()
 
     if existing_key and existing_key != api_key:
         # User has configured their own key — don't touch it
+        if changed:
+            _write_env(env_path, env)
         return {
             "action": "kept",
             "source": source,
             "api_key": existing_key[:16] + "...",
         }
 
-    if existing_key == api_key and existing_url == API_BASE_URL:
-        # Already configured with same fingerprint
+    if existing_key == api_key and not changed:
+        # Already configured with same fingerprint and no legacy cleanup needed
         return {"action": "noop", "source": source}
 
     # Write or update
-    env["OPENAI_API_KEY"] = api_key
-    env["OPENAI_BASE_URL"] = API_BASE_URL
+    env["PERHAPZ_API_KEY"] = api_key
+    if "PERHAPZ_BASE_URL" not in env:
+        env["PERHAPZ_BASE_URL"] = API_BASE_URL
     if "HERMES_DEFAULT_MODEL" not in env:
         env["HERMES_DEFAULT_MODEL"] = DEFAULT_MODEL
     _write_env(env_path, env)
@@ -169,6 +190,7 @@ def bootstrap(hermes_home: Path) -> dict:
         "action": action,
         "source": source,
         "api_key": api_key[:16] + "...",
+        "purged_legacy_openai": changed,
     }
 
 
