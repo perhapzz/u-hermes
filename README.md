@@ -48,6 +48,17 @@ u-hermes/                       # = U 盘根目录
 | **一键启动** | `Mac-Start.command` | `Mac-Start.command` | `Windows-Start.bat` |
 
 > 首次启动会自动下载 Python 运行时和依赖；之后所有运行都是直接启动。
+> Start 启动器会自动启动 WebUI；若配置了飞书 / 微信凭证，消息网关也会在后台一起拉起。
+
+## 接入飞书 / 微信
+
+WebUI 之外，还可以让 Hermes 当做飞书 / 个人微信里的聊天机器人：
+
+1. 跑过一次 `*-Start` 完成首次安装。
+2. 打开 WebUI → Settings → Messaging Gateway，填写 App ID / Secret，点 **保存** 再点 **测试连通性**。
+3. 关闭 Start 启动窗口、再双击 `Windows-Start.bat` / `Mac-Start.command` 重启，网关就会随 Start 一起在后台启动。
+
+详见 [docs/messaging-gateway-setup.md](docs/messaging-gateway-setup.md)。
 
 ## 设计原则
 

@@ -1,0 +1,49 @@
+# U-Hermes Gateway 配置示例
+# ============================================================
+# 复制本文件到 portable/data/.hermes/config.yaml 并填写凭证。
+# 启动后双击 Windows-Gateway.bat 或 Mac-Gateway.command。
+# 详细说明见 docs/messaging-gateway-setup.md
+# ============================================================
+
+platforms:
+
+  # ---------- 飞书 ----------
+  feishu:
+    enabled: true
+    extra:
+      # 在 https://open.feishu.cn/app 创建自建应用，获取下面四项
+      app_id: "cli_xxxxxxxxxxxxxxxx"
+      app_secret: "your-app-secret"
+
+      # 推荐 websocket 模式（无需公网回调，无需 verification_token / encrypt_key）
+      connection_mode: "websocket"
+
+      # 如果使用 webhook 模式，再填这两项；否则保持空字符串
+      verification_token: ""
+      encrypt_key: ""
+
+      # 群聊白名单：只回复指定群（chat_id 列表，逗号分隔字符串）
+      # 留空则需在飞书后台用 group_policy / FEISHU_ALLOWED_USERS 控制
+      # allowed_users: "ou_xxx,ou_yyy"
+
+  # ---------- 微信（个人号 · iLink 协议） ----------
+  # ⚠️ 个人微信账号有被封风险，请使用小号测试。
+  weixin:
+    enabled: false   # 默认关闭；首次需要扫码登录后再启用
+    extra:
+      # 首次扫码登录后会自动写入 portable/data/.hermes/weixin/<account_id>.json
+      # account_id 留空表示新建账号；登录成功后会自动持久化
+      account_id: ""
+
+      # 私聊策略：open=对所有人开放，allowlist=仅白名单
+      dm_policy: "open"
+
+      # 群聊策略：disabled=关闭群聊，allowlist=仅白名单群
+      group_policy: "disabled"
+
+# ---------- 共享设置（可选） ----------
+streaming:
+  enabled: true        # 流式输出（边生成边发送）
+
+session_reset:
+  inactive_minutes: 30 # 30 分钟无互动自动重置会话
