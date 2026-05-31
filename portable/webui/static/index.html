@@ -1367,25 +1367,33 @@
               </div>
             </div>
 
-            <!-- Weixin -->
+            <!-- Weixin (Tencent iLink bot) -->
             <div class="settings-field" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
               <label style="font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer">
                 <input type="checkbox" id="msgGwWeixinEnabled" style="margin:0">
-                <span>个人微信 (Weixin)</span>
+                <span data-i18n="settings_msggw_weixin_title">微信 (腾讯 iLink 小微机器人)</span>
               </label>
-              <div style="font-size:11px;color:var(--muted);margin:4px 0 8px">基于第三方桥（如 ilink/ipad 协议）。需要桥接服务的 base_url 和 token。</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                <div>
-                  <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Account ID</div>
-                  <input type="text" id="msgGwWeixinAccountId" placeholder="wxid_xxxxxxxx" style="width:100%;padding:8px;background:var(--code-bg);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:13px">
-                </div>
-                <div>
-                  <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Bridge Base URL</div>
-                  <input type="text" id="msgGwWeixinBaseUrl" placeholder="http://127.0.0.1:8080" style="width:100%;padding:8px;background:var(--code-bg);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:13px">
+              <div style="font-size:11px;color:var(--muted);margin:4px 0 8px" data-i18n="settings_msggw_weixin_meta">扫码登录腾讯 iLink 平台，凭证自动保存到 WEIXIN_TOKEN / WEIXIN_ACCOUNT_ID / WEIXIN_BASE_URL。注意：生成的是机器人独立账号，非个人微信号，无封号风险，但能力受腾讯接口限制。</div>
+
+              <div id="msgGwWeixinStatusLine" style="font-size:12px;margin:6px 0 10px;color:var(--muted)"></div>
+
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0">
+                <button class="sm-btn" id="msgGwWeixinQrBtn" onclick="startWeixinQrLogin()" style="padding:8px 14px;font-weight:600" data-i18n="settings_msggw_weixin_qrlogin_btn">扫码登录</button>
+                <span id="msgGwWeixinQrHint" style="font-size:11px;color:var(--muted)"></span>
+              </div>
+
+              <div id="msgGwWeixinQrBox" style="display:none;margin:10px 0;padding:12px;border:1px dashed var(--border2);border-radius:8px;background:var(--code-bg)">
+                <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+                  <img id="msgGwWeixinQrImg" alt="QR" style="width:180px;height:180px;border-radius:6px;background:#fff;object-fit:contain">
+                  <div style="flex:1;min-width:200px">
+                    <div id="msgGwWeixinQrStatusText" style="font-size:13px;font-weight:600;margin-bottom:6px"></div>
+                    <div style="font-size:11px;color:var(--muted);line-height:1.6" data-i18n="settings_msggw_weixin_qr_help">① 使用个人微信扫描左侧二维码<br>② 在手机上点击「确认登录」授权小微机器人<br>③ 凭证将自动写入 .env，重启 Gateway 后生效</div>
+                  </div>
                 </div>
               </div>
-              <div style="margin-top:8px">
-                <div style="font-size:11px;color:var(--muted);margin-bottom:4px">允许的用户 (WEIXIN_ALLOWED_USERS, 逗号分隔)</div>
+
+              <div style="margin-top:10px">
+                <div style="font-size:11px;color:var(--muted);margin-bottom:4px" data-i18n="settings_msggw_weixin_allowed_users_label">允许的用户 (WEIXIN_ALLOWED_USERS, 逗号分隔)</div>
                 <input type="text" id="msgGwWeixinAllowedUsers" placeholder="wxid_xxx,wxid_yyy" style="width:100%;padding:8px;background:var(--code-bg);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:13px">
               </div>
             </div>

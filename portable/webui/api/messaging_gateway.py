@@ -12,9 +12,12 @@ Storage rules (kept simple on purpose):
     The gateway already auto-enables Feishu when ``FEISHU_APP_ID`` +
     ``FEISHU_APP_SECRET`` are present (see gateway/config.py), so config.yaml
     does not need a ``platforms.feishu`` block at all.
-  - Weixin — yaml ``platforms.weixin`` (with the third-party bridge URL etc.)
-    plus ``WEIXIN_ALLOWED_USERS`` in ``.env``. The personal-Weixin path
-    pre-dates the unified-env pattern and reads from yaml first.
+  - Weixin — everything in ``.env`` as ``WEIXIN_*`` env vars
+    (``WEIXIN_TOKEN`` + ``WEIXIN_ACCOUNT_ID`` + ``WEIXIN_BASE_URL`` +
+    ``WEIXIN_ALLOWED_USERS``). Credentials are obtained by scanning a
+    Tencent iLink bot QR code in the browser (mirrors EKKOLearnAI's flow).
+    Any stale ``platforms.weixin`` block in ``config.yaml`` is stripped on
+    save so the two sources can't fight.
 
 Exposed via ``/api/messaging-gateway`` (GET/POST). The GET response masks
 secrets so the page can render an "already configured" state without leaking
@@ -31,6 +34,7 @@ from pathlib import Path
 from typing import Any, Dict
 import json as _json
 import time as _time
+import urllib.parse as _uparse
 import urllib.request as _ureq
 import urllib.error as _uerr
 
@@ -105,12 +109,12 @@ def get_messaging_gateway_config() -> Dict[str, Any]:
         cfg = {}
     env = _read_env_file(_env_path())
 
-    platforms = cfg.get("platforms") or {}
-    weixin = platforms.get("weixin") or {}
-    weixin_extra = weixin.get("extra") or {}
-
     feishu_app_id = env.get("FEISHU_APP_ID", "")
     feishu_app_secret = env.get("FEISHU_APP_SECRET", "")
+
+    weixin_token = env.get("WEIXIN_TOKEN", "")
+    weixin_account_id = env.get("WEIXIN_ACCOUNT_ID", "")
+    weixin_base_url = env.get("WEIXIN_BASE_URL", "")
 
     return {
         "feishu": {
@@ -124,9 +128,13 @@ def get_messaging_gateway_config() -> Dict[str, Any]:
             "home_channel": env.get("FEISHU_HOME_CHANNEL", ""),
         },
         "weixin": {
-            "enabled": bool(weixin.get("enabled", False)),
-            "account_id": str(weixin_extra.get("account_id", "") or ""),
-            "base_url": str(weixin_extra.get("base_url", "") or ""),
+            # "Enabled" = both token + account_id present, mirroring the
+            # auto-enable check in gateway/config.py.
+            "enabled": bool(weixin_token and weixin_account_id),
+            "account_id": weixin_account_id,
+            "base_url": weixin_base_url,
+            "token_set": bool(weixin_token),
+            "token_masked": _mask(weixin_token),
             "allowed_users": env.get("WEIXIN_ALLOWED_USERS", ""),
         },
         "paths": {"config": str(_config_path()), "env": str(_env_path())},
@@ -185,32 +193,34 @@ def save_messaging_gateway_config(body: Any) -> Dict[str, Any]:
             else:
                 cfg["platforms"] = platforms
 
-    # ── Weixin (yaml + WEIXIN_ALLOWED_USERS env) ─────────────────────────
+    # ── Weixin (env-only; QR scan populates token/account_id/base_url) ───
     w_in = body.get("weixin")
     if isinstance(w_in, dict):
-        platforms = cfg.get("platforms") or {}
-        if not isinstance(platforms, dict):
-            platforms = {}
-        weixin = platforms.get("weixin") or {}
-        if not isinstance(weixin, dict):
-            weixin = {}
-        weixin["enabled"] = bool(w_in.get("enabled"))
-        extra = weixin.get("extra") or {}
-        if not isinstance(extra, dict):
-            extra = {}
-        for key in ("account_id", "base_url"):
-            if key in w_in:
-                v = str(w_in.get(key) or "").strip()
-                if v:
-                    extra[key] = v
-                else:
-                    extra.pop(key, None)
-        weixin["extra"] = extra
-        platforms["weixin"] = weixin
-        cfg["platforms"] = platforms
+        if "account_id" in w_in:
+            _apply_env(env, "WEIXIN_ACCOUNT_ID",
+                       str(w_in.get("account_id") or ""), clear_if_empty=True)
+        if "base_url" in w_in:
+            _apply_env(env, "WEIXIN_BASE_URL",
+                       str(w_in.get("base_url") or ""), clear_if_empty=True)
+        token_in = w_in.get("token")
+        if isinstance(token_in, str) and token_in.strip():
+            env["WEIXIN_TOKEN"] = token_in.strip()
         if "allowed_users" in w_in:
             _apply_env(env, "WEIXIN_ALLOWED_USERS",
                        str(w_in.get("allowed_users") or ""), clear_if_empty=True)
+        # Disable explicitly = wipe creds so the gateway stops auto-enabling.
+        if "enabled" in w_in and not bool(w_in.get("enabled")):
+            env.pop("WEIXIN_TOKEN", None)
+            env.pop("WEIXIN_ACCOUNT_ID", None)
+            env.pop("WEIXIN_BASE_URL", None)
+        # Drop any stale yaml block so the two sources cannot fight.
+        platforms = cfg.get("platforms")
+        if isinstance(platforms, dict) and "weixin" in platforms:
+            platforms.pop("weixin", None)
+            if not platforms:
+                cfg.pop("platforms", None)
+            else:
+                cfg["platforms"] = platforms
 
     _save_yaml_config_file(cfg_path, cfg)
     _write_env_file(env_path, env)
@@ -353,3 +363,117 @@ def test_feishu_connectivity(body: Any) -> Dict[str, Any]:
         "message_id": msg_id,
         "text": text,
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Weixin (Tencent iLink bot) — QR login flow.
+#
+# Mirrors EKKOLearnAI/hermes-web-ui:
+#   GET  https://ilinkai.weixin.qq.com/ilink/bot/get_bot_qrcode?bot_type=3
+#   GET  https://ilinkai.weixin.qq.com/ilink/bot/get_qrcode_status?qrcode=<id>
+# The status endpoint is a long-poll (~35 s). When status == "confirmed" the
+# response carries {ilink_bot_id, bot_token, baseurl} which we then persist as
+# WEIXIN_ACCOUNT_ID / WEIXIN_TOKEN / WEIXIN_BASE_URL.
+#
+# NOTE: this provisions a Tencent "小微/iLink" *bot account* (independent from
+# the user's personal WeChat), so there is no risk of personal-account ban.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_ILINK_BASE = "https://ilinkai.weixin.qq.com"
+
+
+def _http_get_json(url: str, timeout: float = 35.0) -> Dict[str, Any]:
+    req = _ureq.Request(url, method="GET")
+    req.add_header("Accept", "application/json")
+    try:
+        with _ureq.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+    except _uerr.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace") if e.fp else ""
+        try:
+            return _json.loads(body) if body else {"code": e.code, "msg": e.reason}
+        except Exception:
+            return {"code": e.code, "msg": e.reason, "raw": body}
+    except Exception as e:
+        return {"code": -1, "msg": f"{type(e).__name__}: {e}"}
+    try:
+        return _json.loads(body) if body else {}
+    except Exception:
+        return {"code": -1, "msg": "non-json response", "raw": body}
+
+
+def weixin_get_qrcode() -> Dict[str, Any]:
+    """Fetch a fresh login QR code from Tencent iLink."""
+    data = _http_get_json(f"{_ILINK_BASE}/ilink/bot/get_bot_qrcode?bot_type=3",
+                          timeout=15.0)
+    qr_id = (data or {}).get("qrcode") or ""
+    qr_img = ((data or {}).get("qrcode_img_content")
+              or (data or {}).get("qrcode_url") or "")
+    if not qr_id:
+        return {
+            "ok": False,
+            "error": (data or {}).get("msg") or "无法从腾讯 iLink 获取二维码",
+            "raw": data,
+        }
+    return {"ok": True, "qrcode": qr_id, "qrcode_url": qr_img}
+
+
+def weixin_poll_qrcode_status(qrcode: str) -> Dict[str, Any]:
+    """Poll iLink for the QR's scan/confirm state. Returns a normalised shape.
+
+    Possible ``status`` values: ``wait`` | ``scaned`` | ``expired`` |
+    ``confirmed`` | ``error``. ``confirmed`` carries ``account_id`` /
+    ``token`` / ``base_url``.
+    """
+    qrcode = (qrcode or "").strip()
+    if not qrcode:
+        return {"status": "error", "error": "missing qrcode"}
+    url = f"{_ILINK_BASE}/ilink/bot/get_qrcode_status?qrcode={_uparse.quote(qrcode)}"
+    data = _http_get_json(url, timeout=40.0)
+    status = ((data or {}).get("status") or "wait").lower()
+    if status == "confirmed":
+        return {
+            "status": "confirmed",
+            "account_id": (data or {}).get("ilink_bot_id") or "",
+            "token": (data or {}).get("bot_token") or "",
+            "base_url": (data or {}).get("baseurl") or "",
+        }
+    if status in {"wait", "scaned", "scaned_but_redirect", "expired"}:
+        return {"status": "scaned" if status == "scaned_but_redirect" else status}
+    return {"status": "error", "error": (data or {}).get("msg") or "unknown",
+            "raw": data}
+
+
+def weixin_save_credentials(body: Any) -> Dict[str, Any]:
+    """Persist scanned WEIXIN_* credentials into ``<HERMES_HOME>/.env``.
+
+    Body: ``{account_id, token, base_url?}``. Returns the refreshed config.
+    """
+    if not isinstance(body, dict):
+        raise ValueError("invalid request body")
+    account_id = str(body.get("account_id") or "").strip()
+    token = str(body.get("token") or "").strip()
+    base_url = str(body.get("base_url") or "").strip()
+    if not account_id or not token:
+        raise ValueError("missing account_id or token")
+
+    env_path = _env_path()
+    env = _read_env_file(env_path)
+    env["WEIXIN_ACCOUNT_ID"] = account_id
+    env["WEIXIN_TOKEN"] = token
+    if base_url:
+        env["WEIXIN_BASE_URL"] = base_url.rstrip("/")
+    # Also strip any stale yaml block (the legacy bridge config).
+    cfg_path = _config_path()
+    cfg = _load_yaml_config_file(cfg_path)
+    if isinstance(cfg, dict):
+        platforms = cfg.get("platforms")
+        if isinstance(platforms, dict) and "weixin" in platforms:
+            platforms.pop("weixin", None)
+            if not platforms:
+                cfg.pop("platforms", None)
+            else:
+                cfg["platforms"] = platforms
+            _save_yaml_config_file(cfg_path, cfg)
+    _write_env_file(env_path, env)
+    return {"ok": True, **get_messaging_gateway_config()}

@@ -4091,6 +4091,27 @@ def handle_get(handler, parsed) -> bool:
             bad(handler, str(exc), status=500)
         return True
 
+    if parsed.path == "/api/messaging-gateway/weixin/qrcode":
+        try:
+            from api.messaging_gateway import weixin_get_qrcode
+
+            j(handler, weixin_get_qrcode())
+        except Exception as exc:
+            logger.exception("messaging_gateway weixin qrcode GET failed")
+            bad(handler, str(exc), status=500)
+        return True
+
+    if parsed.path == "/api/messaging-gateway/weixin/qrcode/status":
+        try:
+            from api.messaging_gateway import weixin_poll_qrcode_status
+
+            qr = parse_qs(parsed.query or "").get("qrcode", [""])[0]
+            j(handler, weixin_poll_qrcode_status(qr))
+        except Exception as exc:
+            logger.exception("messaging_gateway weixin qrcode status failed")
+            bad(handler, str(exc), status=500)
+        return True
+
     if parsed.path == "/api/dashboard/config":
         from api import dashboard_probe
 
@@ -5238,6 +5259,18 @@ def handle_post(handler, parsed) -> bool:
             bad(handler, str(exc), status=400)
         except Exception as exc:
             logger.exception("messaging_gateway test-feishu failed")
+            bad(handler, str(exc), status=500)
+        return True
+
+    if parsed.path == "/api/messaging-gateway/weixin/save":
+        try:
+            from api.messaging_gateway import weixin_save_credentials
+
+            j(handler, weixin_save_credentials(body))
+        except ValueError as exc:
+            bad(handler, str(exc), status=400)
+        except Exception as exc:
+            logger.exception("messaging_gateway weixin save failed")
             bad(handler, str(exc), status=500)
         return True
 
