@@ -4107,6 +4107,10 @@ def handle_get(handler, parsed) -> bool:
 
             qr = parse_qs(parsed.query or "").get("qrcode", [""])[0]
             j(handler, weixin_poll_qrcode_status(qr))
+        except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+            # Long-poll often outlives the browser (tab change, reload,
+            # network blip). The body is harmless to drop — no need to log.
+            pass
         except Exception as exc:
             logger.exception("messaging_gateway weixin qrcode status failed")
             bad(handler, str(exc), status=500)
@@ -5271,6 +5275,18 @@ def handle_post(handler, parsed) -> bool:
             bad(handler, str(exc), status=400)
         except Exception as exc:
             logger.exception("messaging_gateway weixin save failed")
+            bad(handler, str(exc), status=500)
+        return True
+
+    if parsed.path == "/api/messaging-gateway/test-weixin":
+        try:
+            from api.messaging_gateway import test_weixin_connectivity
+
+            j(handler, test_weixin_connectivity(body))
+        except ValueError as exc:
+            bad(handler, str(exc), status=400)
+        except Exception as exc:
+            logger.exception("messaging_gateway test-weixin failed")
             bad(handler, str(exc), status=500)
         return True
 

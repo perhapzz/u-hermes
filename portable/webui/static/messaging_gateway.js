@@ -144,8 +144,6 @@
     _wxPollAbort = false;
     const box = _q('msgGwWeixinQrBox');
     const img = _q('msgGwWeixinQrImg');
-    const btn = _q('msgGwWeixinQrBtn');
-    if(btn) btn.disabled = true;
     if(box) box.style.display = '';
     _setWxQrStatusText('正在向腾讯 iLink 申请二维码…', 'warn');
     _setWxHint('');
@@ -154,16 +152,23 @@
       const r = await api('/api/messaging-gateway/weixin/qrcode');
       if(!r || !r.ok){
         _setWxQrStatusText('❌ 获取二维码失败：' + ((r && r.error) || '未知错误'), 'err');
-        if(btn) btn.disabled = false;
         return;
       }
       _wxQrId = r.qrcode || '';
       if(img && r.qrcode_url) img.src = r.qrcode_url;
+      const hintEl = _q('msgGwWeixinQrHint');
+      if(hintEl){
+        if(r.qrcode_page_url){
+          hintEl.innerHTML = '若二维码无法显示，<a href="' + r.qrcode_page_url
+            + '" target="_blank" rel="noopener" style="color:var(--accent)">在新标签打开</a>。';
+        }else{
+          hintEl.textContent = '';
+        }
+      }
       _setWxQrStatusText('📱 请使用个人微信扫描二维码…', 'warn');
       _pollWeixinQrStatus();
     }catch(err){
       _setWxQrStatusText('❌ 请求失败：' + (err && err.message ? err.message : err), 'err');
-      if(btn) btn.disabled = false;
     }
   }
 
@@ -182,7 +187,6 @@
           _pollWeixinQrStatus();
         }else if(st === 'expired'){
           _setWxQrStatusText('⌛ 二维码已过期，请重新点击「扫码登录」。', 'err');
-          const btn = _q('msgGwWeixinQrBtn'); if(btn) btn.disabled = false;
         }else if(st === 'confirmed'){
           _setWxQrStatusText('🎉 已确认登录，正在保存凭证…', 'ok');
           try{
@@ -199,12 +203,9 @@
             await loadMessagingGatewayConfig();
           }catch(err){
             _setWxQrStatusText('❌ 保存凭证失败：' + (err && err.message ? err.message : err), 'err');
-          }finally{
-            const btn = _q('msgGwWeixinQrBtn'); if(btn) btn.disabled = false;
           }
         }else{
           _setWxQrStatusText('❌ 错误：' + ((r && r.error) || st), 'err');
-          const btn = _q('msgGwWeixinQrBtn'); if(btn) btn.disabled = false;
         }
       }catch(err){
         // Network blip — long poll often legitimately times out; just retry.
@@ -214,4 +215,27 @@
   }
 
   window.startWeixinQrLogin = startWeixinQrLogin;
+
+  async function testWeixinConnectivity(){
+    _setStatus('正在通过 iLink getupdates 验证 token…', 'info');
+    try{
+      const r = await api('/api/messaging-gateway/test-weixin', {
+        method: 'POST',
+        body: '{}',
+      });
+      if(r && r.ok){
+        const extra = (typeof r.pending_messages === 'number')
+          ? `  pending=${r.pending_messages}` : '';
+        _setStatus(`✅ Token 有效。account_id=${r.account_id || '-'}${extra}`, 'ok');
+      }else{
+        const stage = r && r.stage ? `[${r.stage}] ` : '';
+        const code = (r && (r.errcode != null || r.ret != null))
+          ? ` (ret=${r.ret} errcode=${r.errcode})` : '';
+        _setStatus(`❌ ${stage}${(r && r.error) || '未知错误'}${code}`, 'error');
+      }
+    }catch(err){
+      _setStatus('❌ 请求失败：' + (err && err.message ? err.message : err), 'error');
+    }
+  }
+  window.testWeixinConnectivity = testWeixinConnectivity;
 })();

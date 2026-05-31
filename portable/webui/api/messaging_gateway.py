@@ -403,19 +403,56 @@ def _http_get_json(url: str, timeout: float = 35.0) -> Dict[str, Any]:
 
 
 def weixin_get_qrcode() -> Dict[str, Any]:
-    """Fetch a fresh login QR code from Tencent iLink."""
+    """Fetch a fresh login QR code from Tencent iLink.
+
+    iLink returns ``qrcode_img_content`` as an H5 *page* URL (not an image),
+    so we additionally render the actual scannable QR locally as an inline
+    SVG data URL — the page URL embeds the qrcode id, which is what WeChat
+    needs to authorise the bot.
+    """
     data = _http_get_json(f"{_ILINK_BASE}/ilink/bot/get_bot_qrcode?bot_type=3",
                           timeout=15.0)
     qr_id = (data or {}).get("qrcode") or ""
-    qr_img = ((data or {}).get("qrcode_img_content")
-              or (data or {}).get("qrcode_url") or "")
+    page_url = ((data or {}).get("qrcode_img_content")
+                or (data or {}).get("qrcode_url") or "")
     if not qr_id:
         return {
             "ok": False,
             "error": (data or {}).get("msg") or "无法从腾讯 iLink 获取二维码",
             "raw": data,
         }
-    return {"ok": True, "qrcode": qr_id, "qrcode_url": qr_img}
+    # Encode the H5 page URL into a QR PNG/SVG locally. WeChat scans the URL,
+    # follows the redirect, then prompts the user to confirm the bot login.
+    qr_data_url = ""
+    try:
+        import io as _io
+        import base64 as _b64
+        import qrcode as _qrcode  # type: ignore
+        from qrcode.image.svg import SvgPathImage as _SvgPathImage  # type: ignore
+
+        img = _qrcode.make(
+            page_url or qr_id,
+            image_factory=_SvgPathImage,
+            box_size=10,
+            border=2,
+        )
+        buf = _io.BytesIO()
+        img.save(buf)
+        qr_data_url = (
+            "data:image/svg+xml;base64,"
+            + _b64.b64encode(buf.getvalue()).decode("ascii")
+        )
+    except Exception:
+        # Fall back to the raw page URL — the frontend will open it in a new
+        # tab so the user can still scan it.
+        qr_data_url = page_url
+
+    return {
+        "ok": True,
+        "qrcode": qr_id,
+        "qrcode_url": qr_data_url,
+        "qrcode_page_url": page_url,
+    }
 
 
 def weixin_poll_qrcode_status(qrcode: str) -> Dict[str, Any]:
@@ -477,3 +514,125 @@ def weixin_save_credentials(body: Any) -> Dict[str, Any]:
             _save_yaml_config_file(cfg_path, cfg)
     _write_env_file(env_path, env)
     return {"ok": True, **get_messaging_gateway_config()}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Weixin connectivity test — POST /api/messaging-gateway/test-weixin
+#
+# Verifies that the saved WEIXIN_TOKEN + WEIXIN_BASE_URL are still valid by
+# calling iLink's ``getupdates`` endpoint with an empty buffer (same call the
+# adapter's long-poll loop makes). Any non-zero ``ret``/``errcode`` means the
+# token expired and the user must re-scan.
+# ─────────────────────────────────────────────────────────────────────────────
+
+import secrets as _secrets
+import struct as _struct
+
+_ILINK_APP_ID = "bot"
+_ILINK_APP_CLIENT_VERSION = (2 << 16) | (2 << 8) | 0  # 2.2.0
+_CHANNEL_VERSION = "2.2.0"
+
+
+def _random_wechat_uin() -> str:
+    val = _struct.unpack(">I", _secrets.token_bytes(4))[0]
+    import base64 as _b64
+    return _b64.b64encode(str(val).encode()).decode("ascii")
+
+
+def _ilink_post(url: str, payload: Dict[str, Any], token: str,
+                timeout: float = 8.0) -> Dict[str, Any]:
+    body = _json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    req = _ureq.Request(url, data=body, method="POST")
+    req.add_header("Content-Type", "application/json")
+    req.add_header("AuthorizationType", "ilink_bot_token")
+    req.add_header("Authorization", f"Bearer {token}")
+    req.add_header("iLink-App-Id", _ILINK_APP_ID)
+    req.add_header("iLink-App-ClientVersion", str(_ILINK_APP_CLIENT_VERSION))
+    req.add_header("X-WECHAT-UIN", _random_wechat_uin())
+    try:
+        with _ureq.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+    except _uerr.HTTPError as e:
+        raw = e.read().decode("utf-8", errors="replace") if e.fp else ""
+        try:
+            return _json.loads(raw) if raw else {"ret": e.code, "errmsg": e.reason}
+        except Exception:
+            return {"ret": e.code, "errmsg": e.reason, "raw": raw}
+    except Exception as e:
+        return {"ret": -1, "errmsg": f"{type(e).__name__}: {e}"}
+    try:
+        return _json.loads(raw) if raw else {}
+    except Exception:
+        return {"ret": -1, "errmsg": "non-json response", "raw": raw}
+
+
+def test_weixin_connectivity(body: Any) -> Dict[str, Any]:
+    """One-shot iLink connectivity check.
+
+    Sends an empty ``getupdates`` call (the same long-poll endpoint the
+    gateway adapter uses) with a short timeout. ``ret: 0`` means the token
+    is alive; ``errcode: -14`` means the session expired and the user must
+    re-scan via the QR-login button.
+    """
+    env = _read_env_file(_env_path())
+    token = (env.get("WEIXIN_TOKEN") or os.getenv("WEIXIN_TOKEN") or "").strip()
+    base_url = (env.get("WEIXIN_BASE_URL") or os.getenv("WEIXIN_BASE_URL") or "").strip()
+    account_id = (env.get("WEIXIN_ACCOUNT_ID") or os.getenv("WEIXIN_ACCOUNT_ID") or "").strip()
+    if not token or not base_url:
+        return {"ok": False, "stage": "config",
+                "error": "未配置 WEIXIN_TOKEN / WEIXIN_BASE_URL，请先扫码登录。"}
+
+    base = base_url.rstrip("/")
+    # getupdates is a *long-poll* — when there are no new messages the
+    # server holds the request open for ~25-30s. A read-timeout therefore
+    # actually proves the token + endpoint are reachable; only an
+    # auth-rejection (errcode -14 etc.) or a transport-level failure means
+    # we're broken. We use a short timeout deliberately so the UI returns
+    # fast in the common "no messages" case.
+    url = f"{base}/ilink/bot/getupdates"
+    resp = _ilink_post(
+        url,
+        {"get_updates_buf": "", "base_info": {"channel_version": _CHANNEL_VERSION}},
+        token=token,
+        timeout=6.0,
+    )
+
+    ret = resp.get("ret")
+    errcode = resp.get("errcode")
+    errmsg = resp.get("errmsg") or resp.get("msg") or ""
+
+    # Read-timeout against a long-poll = connection is alive, nothing to fetch.
+    if ret == -1 and "timeout" in str(errmsg).lower():
+        return {
+            "ok": True,
+            "account_id": account_id,
+            "base_url": base,
+            "pending_messages": 0,
+            "note": "iLink 长轮询无新消息（连接正常，Token 有效）。",
+        }
+
+    # iLink convention: success = ret == 0 AND no negative errcode
+    if ret == 0 and (errcode in (None, 0)):
+        msg_count = len(resp.get("msgs") or [])
+        return {
+            "ok": True,
+            "account_id": account_id,
+            "base_url": base,
+            "pending_messages": msg_count,
+            "note": "已通过 iLink getupdates 验证 token 有效。",
+        }
+
+    # Special-case the well-known stale-session error.
+    if errcode == -14 or "session" in str(errmsg).lower() and "expir" in str(errmsg).lower():
+        return {
+            "ok": False, "stage": "auth",
+            "error": "Token 已失效 (errcode -14)，请重新扫码登录。",
+            "ret": ret, "errcode": errcode, "errmsg": errmsg,
+        }
+
+    return {
+        "ok": False, "stage": "request",
+        "error": errmsg or f"iLink 返回错误 (ret={ret} errcode={errcode})",
+        "ret": ret, "errcode": errcode, "errmsg": errmsg,
+        "raw": resp,
+    }

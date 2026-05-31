@@ -200,7 +200,7 @@ export HERMES_WEBUI_STATE_DIR="$HERMES_HOME/webui"
 export HERMES_WEBUI_HOST="127.0.0.1"
 export HERMES_WEBUI_AGENT_DIR="$UHERMES_DIR/agent"
 export HERMES_WEBUI_PYTHON="$PYTHON_BIN"
-export PYTHONPATH="$PACKAGES_DIR:$UHERMES_DIR/agent${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH="$UHERMES_DIR/agent:$PACKAGES_DIR${PYTHONPATH:+:$PYTHONPATH}"
 export PATH="$PYTHON_DIR/bin:$PATH"
 export HERMES_WEBUI_DEFAULT_WORKSPACE="$UHERMES_DIR/workspace"
 mkdir -p "$HERMES_WEBUI_DEFAULT_WORKSPACE"
@@ -225,7 +225,7 @@ if [ -f "$HERMES_HOME/.env" ] && grep -q '^FEISHU_APP_ID=' "$HERMES_HOME/.env"; 
     (
         cd "$UHERMES_DIR/agent" && \
         HERMES_HOME="$HERMES_HOME" \
-        PYTHONPATH="$PACKAGES_DIR:$UHERMES_DIR/agent" \
+        PYTHONPATH="$UHERMES_DIR/agent:$PACKAGES_DIR" \
         PYTHONIOENCODING=utf-8 \
         "$PYTHON_BIN" -m gateway.run --verbose \
             >"$DATA_DIR/logs/gateway.log" 2>&1 &

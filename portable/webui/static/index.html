@@ -1396,6 +1396,11 @@
                 <div style="font-size:11px;color:var(--muted);margin-bottom:4px" data-i18n="settings_msggw_weixin_allowed_users_label">允许的用户 (WEIXIN_ALLOWED_USERS, 逗号分隔)</div>
                 <input type="text" id="msgGwWeixinAllowedUsers" placeholder="wxid_xxx,wxid_yyy" style="width:100%;padding:8px;background:var(--code-bg);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:13px">
               </div>
+
+              <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+                <button class="sm-btn" onclick="testWeixinConnectivity()" style="padding:8px 14px;font-weight:600" title="使用保存的 WEIXIN_TOKEN / WEIXIN_BASE_URL 调用 iLink getupdates 接口校验 token 是否仍然有效">测试连通性</button>
+                <span style="font-size:11px;color:var(--muted)">校验已保存的 token 是否还有效。失效时请重新扫码。</span>
+              </div>
             </div>
 
             <div style="display:flex;gap:8px;margin-top:18px">

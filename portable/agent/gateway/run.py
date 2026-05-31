@@ -787,6 +787,34 @@ def _reload_runtime_env_preserving_config_authority() -> None:
         os.environ["HERMES_MAX_ITERATIONS"] = str(agent_cfg["max_turns"])
 
 
+def _persist_env_var(name: str, value: str) -> None:
+    """Append/replace a KEY=VALUE in ~/.hermes/.env and update os.environ.
+
+    Used by trust-on-first-use flows so the running gateway and future
+    restarts both see the new value without manual editing.
+    """
+    os.environ[name] = value
+    try:
+        path = _env_path
+        lines: List[str] = []
+        if path.exists():
+            lines = path.read_text(encoding="utf-8").splitlines()
+        new_line = f"{name}={value}"
+        replaced = False
+        for i, line in enumerate(lines):
+            stripped = line.lstrip()
+            if stripped.startswith(f"{name}=") or stripped.startswith(f"export {name}="):
+                lines[i] = new_line
+                replaced = True
+                break
+        if not replaced:
+            lines.append(new_line)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    except Exception:
+        logger.exception("failed to persist %s to .env", name)
+
+
 _DOCKER_VOLUME_SPEC_RE = re.compile(r"^(?P<host>.+):(?P<container>/[^:]+?)(?::(?P<options>[^:]+))?$")
 _DOCKER_MEDIA_OUTPUT_CONTAINER_PATHS = {"/output", "/outputs"}
 
@@ -6564,6 +6592,27 @@ class GatewayRunner:
 
         if not user_id:
             return False
+
+        # ---- Weixin trust-on-first-use (U-Hermes personal-USB scenario) ----
+        # U-Hermes is a single-user portable assistant; the first DM sender
+        # after a fresh scan becomes the owner so the user doesn't have to
+        # copy/paste an OpenID from the log. Only triggers when:
+        #   - platform is Weixin
+        #   - the message is a 1:1 DM
+        #   - WEIXIN_ALLOWED_USERS is empty (no owner yet)
+        #   - WEIXIN_ALLOW_ALL_USERS is not enabled
+        # After accept, the openid is persisted to ~/.hermes/.env so future
+        # restarts see the same allowlist.
+        if source.platform == Platform.WEIXIN:
+            _wx_allow = os.getenv("WEIXIN_ALLOWED_USERS", "").strip()
+            _wx_allow_all = is_truthy_value(os.getenv("WEIXIN_ALLOW_ALL_USERS", ""))
+            if source.chat_type == "dm" and not _wx_allow and not _wx_allow_all:
+                logger.warning(
+                    "[trust-on-first-use] Weixin allowlist empty — accepting first DM sender %s as owner",
+                    user_id,
+                )
+                _persist_env_var("WEIXIN_ALLOWED_USERS", user_id)
+                return True
 
         platform_env_map = {
             Platform.TELEGRAM: "TELEGRAM_ALLOWED_USERS",

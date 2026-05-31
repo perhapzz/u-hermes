@@ -345,7 +345,9 @@ if exist "%HERMES_HOME%\.env" (
 )
 if "%_GATEWAY_NEEDED%"=="1" (
     echo   Starting messaging gateway in background ^(log: data\logs\gateway.log^)...
-    set "PYTHONPATH=%PACKAGES_DIR%;%UHERMES_DIR%agent"
+    REM Source dir first so edits to portable\agent\gateway\*.py take effect
+    REM without re-installing into packages\. packages\ still provides pip deps.
+    set "PYTHONPATH=%UHERMES_DIR%agent;%PACKAGES_DIR%"
     set "PYTHONIOENCODING=utf-8"
     pushd "%UHERMES_DIR%agent"
     start "" /b "%PYTHON_BIN%" -m gateway.run --verbose >"%DATA_DIR%\logs\gateway.log" 2>&1
