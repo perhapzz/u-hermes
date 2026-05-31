@@ -4803,7 +4803,7 @@ _SETTINGS_DEFAULTS = {
     "inflight_state_max_string_chars": 60000,  # max string length kept inside a recovery snapshot field
     "inflight_state_max_json_chars": 1500000,  # max serialized recovery snapshot payload before pruning
     "hidden_tabs": [],  # sidebar tab panel names hidden by user (e.g. ["tasks","kanban"]); chat and settings are always visible
-    "language": "en",  # UI locale code; must match a key in static/i18n.js LOCALES
+    "language": "zh",  # UI locale code; must match a key in static/i18n.js LOCALES (U-Hermes default: Simplified Chinese)
     "bot_name": os.getenv(
         "HERMES_WEBUI_BOT_NAME", "Hermes"
     ),  # display name for the assistant

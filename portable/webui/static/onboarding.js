@@ -197,7 +197,7 @@ function _renderOnboardingApiKeyField(){
   const labelKey=keyOptional?'onboarding_api_key_label_optional':'onboarding_api_key_label';
   const placeholderKey=keyOptional?'onboarding_api_key_placeholder_optional':'onboarding_api_key_placeholder';
   const helpHtml=keyOptional?`<p class="onboarding-copy onboarding-api-key-help">${esc(t('onboarding_api_key_help_keyless')||'')}</p>`:'';
-  const rechargeHtml=(ONBOARDING.form.provider==='perhapz')?`<a href="https://perhapz.top/recharge?key=${encodeURIComponent(ONBOARDING.form.apiKey||'')}" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;padding:6px 16px;background:var(--accent,#4f8cff);color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:500">Recharge / 充值</a>`:'';
+  const rechargeHtml=(ONBOARDING.form.provider==='perhapz')?`<a href="https://perhapz.top/recharge?key=${encodeURIComponent(ONBOARDING.form.apiKey||'')}" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;padding:6px 16px;background:var(--accent,#4f8cff);color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:500">${esc(t('onboarding_recharge_link'))}</a>`:'';
   return `<label class="onboarding-field" id="onboardingApiKeyField"><span>${t(labelKey)}</span><input id="onboardingApiKeyInput" type="password" value="${esc(ONBOARDING.form.apiKey||'')}" placeholder="${t(placeholderKey)}" oninput="ONBOARDING.form.apiKey=this.value" onblur="_runOnboardingProbe()"></label>${helpHtml}${rechargeHtml}`;
 }
 
@@ -220,9 +220,9 @@ function _renderOnboardingProviderOAuthField(provider){
     return `<div class="onboarding-oauth-card onboarding-oauth-pending" style="margin-top:12px">
     <div class="onboarding-oauth-icon">🔑</div>
     <div style="flex:1">
-      <strong>Use Claude Code OAuth instead</strong>
-      <p style="margin-top:6px;color:var(--muted);font-size:13px"><strong>Claude Code subscription credentials are not the same as an Anthropic API key.</strong> Use this path only when you want Hermes to use Claude Code credentials already available on the server, or start a short polling flow while you complete <code>claude setup-token</code> on the host.</p>
-      <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="sm-btn" id="anthropicOAuthBtn" onclick="startAnthropicOAuth()" type="button">Login with Claude Code</button></div>
+      <strong>${t('onboarding_anthropic_oauth_title')}</strong>
+      <p style="margin-top:6px;color:var(--muted);font-size:13px">${t('onboarding_anthropic_oauth_body')}</p>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="sm-btn" id="anthropicOAuthBtn" onclick="startAnthropicOAuth()" type="button">${t('onboarding_anthropic_oauth_button')}</button></div>
       <div id="anthropicOAuthFlow" style="display:none;margin-top:12px"></div>
     </div>
   </div>`;
@@ -231,9 +231,9 @@ function _renderOnboardingProviderOAuthField(provider){
     return `<div class="onboarding-oauth-card onboarding-oauth-pending" style="margin-top:12px">
     <div class="onboarding-oauth-icon">🔑</div>
     <div style="flex:1">
-      <strong>Login with GitHub Copilot</strong>
-      <p style="margin-top:6px;color:var(--muted);font-size:13px">Authenticate via GitHub OAuth device code flow. You can also paste a token (gho_*, github_pat_*) in the API key field above, or set COPILOT_GITHUB_TOKEN / GH_TOKEN / GITHUB_TOKEN in your environment.</p>
-      <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="sm-btn" id="copilotOAuthBtn" onclick="startCopilotOAuth()" type="button">Login with GitHub</button></div>
+      <strong>${t('onboarding_copilot_oauth_title')}</strong>
+      <p style="margin-top:6px;color:var(--muted);font-size:13px">${t('onboarding_copilot_oauth_body')}</p>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="sm-btn" id="copilotOAuthBtn" onclick="startCopilotOAuth()" type="button">${t('onboarding_copilot_oauth_button')}</button></div>
       <div id="copilotOAuthFlow" style="display:none;margin-top:12px"></div>
     </div>
   </div>`;
@@ -287,7 +287,7 @@ function _renderOnboardingBody(){
     const showBaseUrl=provider&&provider.requires_base_url;
     const keyHelp=provider
       ? (provider.id==='anthropic'
-        ? 'Anthropic API key path: paste an Anthropic Console API key here. This is separate from a Claude Code subscription; use the Claude Code OAuth card if you want subscription credentials instead.'
+        ? t('onboarding_anthropic_key_help')
         : `${t('onboarding_api_key_help_prefix')} ${esc(provider.env_var)}.`)
       : '';
 
@@ -298,9 +298,9 @@ function _renderOnboardingBody(){
       const isReady=!!(ONBOARDING.status.system||{}).chat_ready;
       const providerLabel=esc(currentProviderName);
       const codexOauthPendingBody=currentProviderName==='openai-codex'
-        ? 'This instance is configured to use <strong>openai-codex</strong>, which uses OAuth rather than an API key. Use the button below to authenticate with ChatGPT, then continue once provider status refreshes.'
+        ? t('onboarding_codex_oauth_pending_body')
         : currentProviderName==='copilot'
-        ? 'This instance is configured to use <strong>GitHub Copilot</strong>, which uses OAuth rather than an API key. Use the button below to authenticate with GitHub, then continue once provider status refreshes.'
+        ? t('onboarding_copilot_oauth_pending_body')
         : t('onboarding_oauth_provider_not_ready_body').replace('{provider}',providerLabel);
       if(isReady){
         _setOnboardingNotice(t('onboarding_notice_setup_already_ready'),'success');
@@ -329,7 +329,7 @@ function _renderOnboardingBody(){
               <strong>${t('onboarding_oauth_provider_not_ready_title')}</strong>
               <p>${codexOauthPendingBody}</p>
               ${currentProviderName==='openai-codex'?`<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="sm-btn" id="codexOAuthBtn" onclick="startCodexOAuth()" type="button">${t('oauth_login_codex')}</button></div><div id="codexOAuthFlow" style="display:none;margin-top:12px"></div>`:''}
-              ${currentProviderName==='copilot'?`<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="sm-btn" id="copilotOAuthBtn" onclick="startCopilotOAuth()" type="button">Login with GitHub</button></div><div id="copilotOAuthFlow" style="display:none;margin-top:12px"></div>`:''}
+              ${currentProviderName==='copilot'?`<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="sm-btn" id="copilotOAuthBtn" onclick="startCopilotOAuth()" type="button">${t('onboarding_copilot_oauth_button')}</button></div><div id="copilotOAuthFlow" style="display:none;margin-top:12px"></div>`:''}
             </div>
           </div>
           <p class="onboarding-copy" style="margin-top:20px">${t('onboarding_oauth_switch_hint')}</p>

@@ -38,14 +38,47 @@ _SUPPORTED_PROVIDER_SETUPS = {
     "perhapz": {
         "label": "Perhapz (U-Hermes)",
         "env_var": "OPENAI_API_KEY",
-        "default_model": "deepseek-v4-flash",
+        "default_model": "gpt-4o",
         "default_base_url": "https://perhapz.top/v1",
         "requires_base_url": False,
         "models": [
+            # OpenAI
+            {"id": "gpt-4o", "label": "GPT-4o"},
+            {"id": "gpt-4o-mini", "label": "GPT-4o mini"},
+            {"id": "gpt-4.1", "label": "GPT-4.1"},
+            {"id": "gpt-4.1-mini", "label": "GPT-4.1 mini"},
+            {"id": "gpt-5", "label": "GPT-5"},
+            {"id": "gpt-5-mini", "label": "GPT-5 mini"},
+            {"id": "o1", "label": "o1"},
+            {"id": "o1-mini", "label": "o1 mini"},
+            {"id": "o3", "label": "o3"},
+            {"id": "o3-mini", "label": "o3 mini"},
+            {"id": "o4-mini", "label": "o4 mini"},
+            # Anthropic
+            {"id": "claude-sonnet-4.6", "label": "Claude Sonnet 4.6"},
+            {"id": "claude-sonnet-4.5", "label": "Claude Sonnet 4.5"},
+            {"id": "claude-opus-4.1", "label": "Claude Opus 4.1"},
+            {"id": "claude-haiku-4.5", "label": "Claude Haiku 4.5"},
+            {"id": "claude-3.7-sonnet", "label": "Claude 3.7 Sonnet"},
+            {"id": "claude-3.5-sonnet", "label": "Claude 3.5 Sonnet"},
+            {"id": "claude-3.5-haiku", "label": "Claude 3.5 Haiku"},
+            # Google
+            {"id": "gemini-2.5-pro", "label": "Gemini 2.5 Pro"},
+            {"id": "gemini-2.5-flash", "label": "Gemini 2.5 Flash"},
+            {"id": "gemini-2.0-flash", "label": "Gemini 2.0 Flash"},
+            # DeepSeek
             {"id": "deepseek-v4-flash", "label": "DeepSeek V4 Flash"},
             {"id": "deepseek-chat", "label": "DeepSeek V3"},
+            {"id": "deepseek-reasoner", "label": "DeepSeek R1"},
+            # Qwen
             {"id": "qwen-plus", "label": "Qwen Plus"},
             {"id": "qwen-turbo", "label": "Qwen Turbo"},
+            {"id": "qwen-max", "label": "Qwen Max"},
+            # Others
+            {"id": "grok-4", "label": "Grok 4"},
+            {"id": "grok-3", "label": "Grok 3"},
+            {"id": "kimi-k2", "label": "Kimi K2"},
+            {"id": "glm-4.6", "label": "GLM-4.6"},
         ],
         "category": "recommended",
         "quick": True,
@@ -217,16 +250,16 @@ _SUPPORTED_PROVIDER_SETUPS = {
 }
 
 _PROVIDER_CATEGORIES = [
-    {"id": "recommended", "label": "Recommended", "order": -1},
-    {"id": "easy_start", "label": "Easy start", "order": 0},
-    {"id": "self_hosted", "label": "Open / self-hosted", "order": 1},
-    {"id": "specialized", "label": "Specialized", "order": 2},
+    {"id": "recommended", "label": "推荐", "order": -1},
+    {"id": "easy_start", "label": "快速开始", "order": 0},
+    {"id": "self_hosted", "label": "本地 / 开源", "order": 1},
+    {"id": "specialized", "label": "专业服务", "order": 2},
 ]
 
 _UNSUPPORTED_PROVIDER_NOTE = (
-    "Advanced provider flows such as Nous Portal are still "
-    "terminal-first. OpenAI Codex, Anthropic Claude Code, and GitHub Copilot can be authenticated in this onboarding flow "
-    "when your Hermes config selects the corresponding provider."
+    "高级提供商流程（如 Nous Portal）仍需在终端中完成。"
+    "当你的 Hermes 配置选择了对应提供商时，"
+    "OpenAI Codex、Anthropic Claude Code 和 GitHub Copilot 可以在本引导流程中完成认证。"
 )
 
 
@@ -760,37 +793,34 @@ def _status_from_runtime(cfg: dict, imports_ok: bool) -> dict:
     if not _HERMES_FOUND or not imports_ok:
         state = "agent_unavailable"
         note = (
-            "Hermes is not fully importable from the Web UI yet. Finish bootstrap or fix the "
-            "agent install before provider setup will work."
+            "Web UI 还无法完整导入 Hermes。请先完成 bootstrap 或修复助手安装，"
+            "然后再进行提供商设置。"
         )
     elif chat_ready:
         state = "ready"
         provider_name = _PROVIDER_DISPLAY.get(
             provider, provider.title() if provider else "Hermes"
         )
-        note = f"Hermes is minimally configured and ready to chat via {provider_name}."
+        note = f"Hermes 已完成最小配置，可以通过 {provider_name} 开始聊天。"
     elif provider_configured:
         state = "provider_incomplete"
         if provider == "custom" and not base_url:
             note = (
-                "Hermes has a saved provider/model selection but still needs the "
-                "base URL and API key required to chat."
+                "Hermes 已保存提供商/模型选择，但仍需要填写 base URL 和 API key 才能聊天。"
             )
         elif provider not in _SUPPORTED_PROVIDER_SETUPS:
             # OAuth / unsupported provider: avoid misleading "API key" wording.
             note = (
-                f"Provider '{provider}' is configured but not yet authenticated. "
-                "Run 'hermes auth' or 'hermes model' in a terminal to complete "
-                "setup, then reload the Web UI."
+                f"提供商 '{provider}' 已配置但尚未认证。请在终端运行 'hermes auth' 或 'hermes model' "
+                "完成设置，然后重新加载 Web UI。"
             )
         else:
             note = (
-                "Hermes has a saved provider/model selection but still needs the "
-                "API key required to chat."
+                "Hermes 已保存提供商/模型选择，但仍需要填写 API key 才能聊天。"
             )
     else:
         state = "needs_provider"
-        note = "Hermes is installed, but you still need to choose a provider and save working credentials."
+        note = "Hermes 已安装，但你还需要选择一个提供商并保存有效凭证。"
 
     env_path = _get_active_hermes_home() / ".env"
     existing_env = _load_env_file(env_path)

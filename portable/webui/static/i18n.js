@@ -973,6 +973,16 @@ const LOCALES = {
     onboarding_oauth_provider_not_ready_title: 'OAuth provider not yet authenticated',
     onboarding_oauth_provider_not_ready_body: 'This instance is configured to use <strong>{provider}</strong>, which uses OAuth rather than an API key. Run <code>hermes auth</code> or <code>hermes model</code> in a terminal to authenticate, then reload the Web UI.',
     onboarding_oauth_switch_hint: 'Or choose a different provider below to switch to an API-key setup:',
+    onboarding_anthropic_oauth_title: 'Use Claude Code OAuth instead',
+    onboarding_anthropic_oauth_body: '<strong>Claude Code subscription credentials are not the same as an Anthropic API key.</strong> Use this path only when you want Hermes to use Claude Code credentials already available on the server, or start a short polling flow while you complete <code>claude setup-token</code> on the host.',
+    onboarding_anthropic_oauth_button: 'Login with Claude Code',
+    onboarding_anthropic_key_help: 'Anthropic API key path: paste an Anthropic Console API key here. This is separate from a Claude Code subscription; use the Claude Code OAuth card if you want subscription credentials instead.',
+    onboarding_copilot_oauth_title: 'Login with GitHub Copilot',
+    onboarding_copilot_oauth_body: 'Authenticate via GitHub OAuth device code flow. You can also paste a token (gho_*, github_pat_*) in the API key field above, or set COPILOT_GITHUB_TOKEN / GH_TOKEN / GITHUB_TOKEN in your environment.',
+    onboarding_copilot_oauth_button: 'Login with GitHub',
+    onboarding_codex_oauth_pending_body: 'This instance is configured to use <strong>openai-codex</strong>, which uses OAuth rather than an API key. Use the button below to authenticate with ChatGPT, then continue once provider status refreshes.',
+    onboarding_copilot_oauth_pending_body: 'This instance is configured to use <strong>GitHub Copilot</strong>, which uses OAuth rather than an API key. Use the button below to authenticate with GitHub, then continue once provider status refreshes.',
+    onboarding_recharge_link: 'Recharge / 充值',
     oauth_login_codex: 'Login with Codex (ChatGPT)',
     oauth_codex_step1: 'Step 1: Visit this URL and enter the code',
     oauth_codex_step2: 'Step 2: Enter this code on the page',
@@ -987,6 +997,7 @@ const LOCALES = {
     onboarding_provider_label: 'Setup mode',
     onboarding_quick_setup_badge: 'quick setup',
     provider_category_easy_start: 'Easy start',
+    provider_category_recommended: 'Recommended',
     provider_category_self_hosted: 'Open / self-hosted',
     provider_category_specialized: 'Specialized',
     onboarding_api_key_label: 'API key',
@@ -8302,6 +8313,16 @@ const LOCALES = {
     onboarding_oauth_provider_not_ready_title: 'OAuth 提供商尚未认证',
     onboarding_oauth_provider_not_ready_body: '此实例已配置为使用 <strong>{provider}</strong>，该提供商使用 OAuth 而非 API key。请在终端运行 <code>hermes auth</code> 或 <code>hermes model</code> 完成认证，然后重新加载 Web UI。',
     onboarding_oauth_switch_hint: '或者在下方选择其他提供商，切换到 API key 配置：',
+    onboarding_anthropic_oauth_title: '改用 Claude Code OAuth 登录',
+    onboarding_anthropic_oauth_body: '<strong>Claude Code 订阅凭证不等同于 Anthropic API key。</strong>仅当你希望 Hermes 使用服务端已有的 Claude Code 凭证时使用此方式，或者在主机上运行 <code>claude setup-token</code> 完成短轮询认证。',
+    onboarding_anthropic_oauth_button: '使用 Claude Code 登录',
+    onboarding_anthropic_key_help: 'Anthropic API key 方式：请在此粘贴来自 Anthropic Console 的 API key。这与 Claude Code 订阅不同；如果你希望使用订阅凭证，请使用 Claude Code OAuth 卡片。',
+    onboarding_copilot_oauth_title: '使用 GitHub Copilot 登录',
+    onboarding_copilot_oauth_body: '通过 GitHub OAuth 设备码流程认证。你也可以在上方 API key 字段粘贴 token（gho_*、github_pat_*），或在环境变量中设置 COPILOT_GITHUB_TOKEN / GH_TOKEN / GITHUB_TOKEN。',
+    onboarding_copilot_oauth_button: '使用 GitHub 登录',
+    onboarding_codex_oauth_pending_body: '此实例已配置为使用 <strong>openai-codex</strong>，该提供商使用 OAuth 而非 API key。请点击下方按钮通过 ChatGPT 完成认证，然后在提供商状态刷新后继续。',
+    onboarding_copilot_oauth_pending_body: '此实例已配置为使用 <strong>GitHub Copilot</strong>，该提供商使用 OAuth 而非 API key。请点击下方按钮通过 GitHub 完成认证，然后在提供商状态刷新后继续。',
+    onboarding_recharge_link: '充值 / Recharge',
     onboarding_notice_workspace: '这些值复用与正式应用相同的设置 API。',
     onboarding_workspace_label: '工作区',
     onboarding_workspace_or_path: '或输入工作区路径',
@@ -8309,6 +8330,7 @@ const LOCALES = {
     onboarding_provider_label: '设置模式',
     onboarding_quick_setup_badge: '快速设置',
     provider_category_easy_start: '快速开始',
+    provider_category_recommended: '推荐',
     provider_category_self_hosted: '本地 / 开源',
     provider_category_specialized: '专业服务',
     onboarding_api_key_label: 'API key',
@@ -15079,7 +15101,8 @@ function resolveLocale(lang) {
  * @returns {string}
  */
 function resolvePreferredLocale(primary, fallback) {
-  return resolveLocale(primary) || resolveLocale(fallback) || 'en';
+  // U-Hermes default: Simplified Chinese ('zh') when no explicit preference exists.
+  return resolveLocale(primary) || resolveLocale(fallback) || (LOCALES.zh ? 'zh' : 'en');
 }
 
 /**
@@ -15117,11 +15140,32 @@ function setLocale(lang) {
 /**
  * Load locale from localStorage (called once at boot, before DOMContentLoaded).
  * Server-persisted preference is applied later in loadSettingsPanel().
+ *
+ * Precedence:
+ *   1) localStorage `hermes-lang` (user's last explicit choice)
+ *   2) browser navigator.language / navigator.languages (auto-detect)
+ *   3) U-Hermes default: Simplified Chinese ('zh')
+ *
+ * The Chinese-by-default fallback matches this build's primary audience and
+ * ensures the first-run onboarding wizard renders in 中文 before the
+ * server-persisted preference is fetched.
  */
 function loadLocale() {
   let stored = null;
   try { stored = localStorage.getItem('hermes-lang'); } catch (_) {}
-  setLocale(resolvePreferredLocale(null, stored));
+  if (stored) { setLocale(resolvePreferredLocale(null, stored)); return; }
+  // Try browser languages in order.
+  try {
+    const langs = (navigator.languages && navigator.languages.length)
+      ? navigator.languages
+      : (navigator.language ? [navigator.language] : []);
+    for (const lang of langs) {
+      const resolved = resolveLocale(lang);
+      if (resolved) { setLocale(resolved); return; }
+    }
+  } catch (_) {}
+  // U-Hermes default audience is Chinese-speaking.
+  setLocale(LOCALES.zh ? 'zh' : 'en');
 }
 
 /**
