@@ -218,6 +218,20 @@ while lsof -i :$PORT >/dev/null 2>&1; do
 done
 export HERMES_WEBUI_PORT="$PORT"
 
+# ---- Auto-launch messaging gateway in background if configured ----
+if [ -f "$HERMES_HOME/.env" ] && grep -q '^FEISHU_APP_ID=' "$HERMES_HOME/.env"; then
+    echo -e "  ${CYAN}Starting messaging gateway in background (log: data/logs/gateway.log)...${NC}"
+    mkdir -p "$DATA_DIR/logs"
+    (
+        cd "$UHERMES_DIR/agent" && \
+        HERMES_HOME="$HERMES_HOME" \
+        PYTHONPATH="$PACKAGES_DIR:$UHERMES_DIR/agent" \
+        PYTHONIOENCODING=utf-8 \
+        "$PYTHON_BIN" -m gateway.run --verbose \
+            >"$DATA_DIR/logs/gateway.log" 2>&1 &
+    )
+fi
+
 # ---- Start webui ----
 echo -e "  ${CYAN}Starting Hermes on port $PORT...${NC}"
 echo ""

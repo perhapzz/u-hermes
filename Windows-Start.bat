@@ -335,6 +335,24 @@ set "HERMES_WEBUI_DEFAULT_WORKSPACE=%UHERMES_DIR%workspace"
 if not exist "%HERMES_WEBUI_DEFAULT_WORKSPACE%" mkdir "%HERMES_WEBUI_DEFAULT_WORKSPACE%" 2>nul
 set "HERMES_WEBUI_PORT=8787"
 
+REM ---- Auto-launch messaging gateway in a separate window if configured ----
+REM Triggered by FEISHU_APP_ID in .env. The gateway loads .env itself via
+REM hermes_cli.env_loader, so we only need to pass HERMES_HOME + PYTHONPATH.
+set "_GATEWAY_NEEDED=0"
+if exist "%HERMES_HOME%\.env" (
+    findstr /b /c:"FEISHU_APP_ID=" "%HERMES_HOME%\.env" >nul 2>&1
+    if not errorlevel 1 set "_GATEWAY_NEEDED=1"
+)
+if "%_GATEWAY_NEEDED%"=="1" (
+    echo   Starting messaging gateway in background ^(log: data\logs\gateway.log^)...
+    set "PYTHONPATH=%PACKAGES_DIR%;%UHERMES_DIR%agent"
+    set "PYTHONIOENCODING=utf-8"
+    pushd "%UHERMES_DIR%agent"
+    start "" /b "%PYTHON_BIN%" -m gateway.run --verbose >"%DATA_DIR%\logs\gateway.log" 2>&1
+    popd
+    echo.
+)
+
 echo   Starting Hermes on port 8787...
 echo   Open in browser: http://127.0.0.1:8787/
 echo.
