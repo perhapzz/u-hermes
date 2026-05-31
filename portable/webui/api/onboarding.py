@@ -37,7 +37,7 @@ _SUPPORTED_PROVIDER_SETUPS = {
     # ── U-Hermes default ──────────────────────────────────────────────
     "perhapz": {
         "label": "Perhapz (U-Hermes)",
-        "env_var": "OPENAI_API_KEY",
+        "env_var": "PERHAPZ_API_KEY",
         "default_model": "gpt-4o",
         "default_base_url": "https://perhapz.top/v1",
         "requires_base_url": False,

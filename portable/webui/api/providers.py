@@ -635,7 +635,7 @@ print(json.dumps(_snapshot_payload(snapshot)))
 # Providers not listed here (OAuth/token-flow providers like copilot, nous,
 # openai-codex) cannot have their keys managed from the WebUI.
 _PROVIDER_ENV_VAR: dict[str, str] = {
-    "perhapz": "OPENAI_API_KEY",
+    "perhapz": "PERHAPZ_API_KEY",
     "openrouter": "OPENROUTER_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
     "openai": "OPENAI_API_KEY",
