@@ -6804,6 +6804,35 @@ function _buildProviderCard(p){
     }
     field.appendChild(row);
     body.appendChild(field);
+
+    // Perhapz-only: shortcut button to the recharge page, prefilled with the
+    // key the user just typed (if any) so they don't have to log in again.
+    if(p.id==='perhapz'){
+      const rechargeRow=document.createElement('div');
+      rechargeRow.className='provider-card-row';
+      rechargeRow.style.marginTop='6px';
+      const rechargeBtn=document.createElement('button');
+      rechargeBtn.type='button';
+      rechargeBtn.className='provider-card-btn provider-card-btn-primary';
+      rechargeBtn.textContent=t('onboarding_recharge_link')||'Recharge';
+      rechargeBtn.onclick=async ()=>{
+        const typed=(input&&input.value.trim())||'';
+        if(typed){
+          // User just typed a new key — prefer it without round-tripping the server.
+          window.open('https://perhapz.top/recharge?key='+encodeURIComponent(typed),'_blank','noopener');
+          return;
+        }
+        try{
+          const res=await api('/api/providers/perhapz/recharge-url');
+          const url=(res&&res.url)||'https://perhapz.top/recharge';
+          window.open(url,'_blank','noopener');
+        }catch(err){
+          window.open('https://perhapz.top/recharge','_blank','noopener');
+        }
+      };
+      rechargeRow.appendChild(rechargeBtn);
+      body.appendChild(rechargeRow);
+    }
   }else{
     const hint=document.createElement('div');
     hint.className='provider-card-hint';

@@ -1370,6 +1370,37 @@ def get_provider_quota(provider_id: str | None = None, *, refresh: bool = False)
     if provider in _ACCOUNT_USAGE_PROVIDERS:
         return _provider_account_usage_status(provider, display_name, refresh=refresh)
 
+    if provider == "perhapz":
+        usage = get_perhapz_usage()
+        if not usage.get("ok"):
+            return {
+                "ok": False,
+                "provider": "perhapz",
+                "display_name": display_name,
+                "supported": True,
+                "status": usage.get("status") or "unavailable",
+                "quota": None,
+                "message": usage.get("message") or "Perhapz balance is temporarily unavailable.",
+            }
+        balance = usage.get("balance")
+        today_cost = (usage.get("today") or {}).get("cost")
+        total_cost = (usage.get("total") or {}).get("cost")
+        unit = usage.get("unit") or "USD"
+        return {
+            "ok": True,
+            "provider": "perhapz",
+            "display_name": display_name,
+            "supported": True,
+            "status": "available",
+            "label": f"Perhapz {unit} balance",
+            "quota": {
+                "limit_remaining": balance,
+                "usage": today_cost,
+                "limit": total_cost,
+            },
+            "message": f"Perhapz balance: {balance} {unit} (today {today_cost} {unit}).",
+        }
+
     if provider != "openrouter":
         detail = "OpenAI/Anthropic rate-limit headers are a follow-up once WebUI captures provider response metadata."
         return {
@@ -2092,6 +2123,81 @@ def remove_provider_key(provider_id: str) -> dict[str, Any]:
         _clean_provider_key_from_config(provider_id)
 
     return result
+
+
+def get_perhapz_recharge_url() -> dict[str, Any]:
+    """Build the perhapz.top recharge URL, prefilled with the stored API key.
+
+    The key never leaves the server: only the fully-formed URL is returned to
+    the browser. If no key is configured, returns the bare recharge URL so the
+    user can still sign in manually.
+    """
+    from urllib.parse import quote
+
+    key = _get_provider_api_key("perhapz")
+    base = "https://perhapz.top/recharge"
+    url = f"{base}?key={quote(key, safe='')}" if key else base
+    return {"url": url, "has_key": bool(key)}
+
+
+_PERHAPZ_USAGE_URL = "https://perhapz.top/v1/usage"
+
+
+def get_perhapz_usage() -> dict[str, Any]:
+    """Fetch balance/usage stats for the configured perhapz API key.
+
+    Calls perhapz's ``/v1/usage`` endpoint server-side so the key never reaches
+    the browser. Returns a small sanitized subset suitable for the provider
+    card (balance + today's usage + totals).
+    """
+    api_key = _get_provider_api_key("perhapz")
+    if not api_key:
+        return {"ok": False, "status": "no_key", "message": "No Perhapz API key configured."}
+
+    req = urllib.request.Request(
+        _PERHAPZ_USAGE_URL,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=_PROVIDER_QUOTA_TIMEOUT_SECONDS) as resp:
+            raw = resp.read()
+        payload = json.loads(raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else raw)
+    except urllib.error.HTTPError as exc:
+        status = "invalid_key" if exc.code in (401, 403) else "unavailable"
+        return {"ok": False, "status": status, "message": f"Perhapz returned HTTP {exc.code}."}
+    except (TimeoutError, urllib.error.URLError, json.JSONDecodeError, OSError, ValueError) as exc:
+        return {"ok": False, "status": "unavailable", "message": f"Could not reach Perhapz: {exc}"}
+
+    if not isinstance(payload, dict):
+        return {"ok": False, "status": "unavailable", "message": "Unexpected response shape."}
+
+    usage = payload.get("usage") if isinstance(payload.get("usage"), dict) else {}
+    today = usage.get("today") if isinstance(usage.get("today"), dict) else {}
+    total = usage.get("total") if isinstance(usage.get("total"), dict) else {}
+
+    return {
+        "ok": True,
+        "status": "available",
+        "balance": _quota_number(payload.get("balance")),
+        "remaining": _quota_number(payload.get("remaining")),
+        "unit": str(payload.get("unit") or "").strip() or None,
+        "plan_name": str(payload.get("planName") or "").strip() or None,
+        "mode": str(payload.get("mode") or "").strip() or None,
+        "is_valid": bool(payload.get("isValid")) if "isValid" in payload else None,
+        "today": {
+            "cost": _quota_number(today.get("cost")),
+            "requests": _quota_number(today.get("requests")),
+            "total_tokens": _quota_number(today.get("total_tokens")),
+        },
+        "total": {
+            "cost": _quota_number(total.get("cost")),
+            "requests": _quota_number(total.get("requests")),
+            "total_tokens": _quota_number(total.get("total_tokens")),
+        },
+    }
 
 
 def _clean_provider_key_from_config(provider_id: str) -> None:
