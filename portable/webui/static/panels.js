@@ -7221,6 +7221,47 @@ async function checkUpdatesNow(){
   }
 }
 
+// U-Hermes-specific: pull the whole repo from Gitee and tell the user to
+// re-launch the *-Start script to load the new code. The button is wired in
+// index.html (System section of Settings) and the backend lives in
+// api/uhermes_update.py.
+async function updateFromGitee(){
+  const btn=$('btnUpdateFromGitee');
+  const label=$('updateGiteeLabel');
+  const spinner=$('updateGiteeSpinner');
+  const status=$('checkUpdatesStatus');
+  if(!btn||!label) return;
+  const confirmMsg=t('settings_update_from_gitee_confirm')
+    ||'Download the latest U-Hermes from Gitee and overwrite the current files? You will need to relaunch after this finishes.';
+  if(!window.confirm(confirmMsg)) return;
+  btn.disabled=true;
+  if(spinner) spinner.style.display='';
+  if(label) label.textContent=t('settings_update_from_gitee_running')||'Updating…';
+  if(status){status.textContent='';status.style.color='';}
+  try{
+    const res=await api('/api/uhermes/update-from-gitee',{method:'POST',body:JSON.stringify({}),timeoutMs:300000});
+    if(res&&res.ok){
+      const restartMsg=t('settings_update_from_gitee_restart')
+        ||'Update downloaded. Please close this window and re-launch U-Hermes to apply.';
+      if(status){status.textContent=restartMsg;status.style.color='var(--success)';}
+    } else {
+      const msg=(res&&res.message)||t('settings_update_check_failed')||'Update failed';
+      if(status){status.textContent=msg;status.style.color='var(--error)';}
+    }
+  } catch(e){
+    console.warn('[updateFromGitee]',e);
+    let userMsg=t('settings_update_check_failed')||'Update failed';
+    if(e&&e.response){
+      try{const body=JSON.parse(e.response);if(body.message) userMsg=String(body.message).substring(0,240);}catch(_){}
+    }
+    if(status){status.textContent=userMsg;status.style.color='var(--error)';}
+  } finally {
+    btn.disabled=false;
+    if(spinner) spinner.style.display='none';
+    if(label) label.textContent=t('settings_update_from_gitee')||'Update from Gitee';
+  }
+}
+
 // ── Auxiliary Models ──────────────────────────────────────────────────────────
 
 // Canonical auxiliary task slots with display names.

@@ -6707,6 +6707,13 @@ def handle_post(handler, parsed) -> bool:
 
         return j(handler, apply_force_update(target))
 
+    # U-Hermes-specific: pull the whole repo from Gitee (or supplied URL).
+    if parsed.path == "/api/uhermes/update-from-gitee":
+        from api.uhermes_update import update_from_gitee
+
+        gitee_url = body.get("gitee_url") if isinstance(body, dict) else None
+        return j(handler, update_from_gitee(gitee_url))
+
     if parsed.path == "/api/updates/summary":
         from api.updates import summarize_update_payload
 
