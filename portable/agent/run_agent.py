@@ -1181,7 +1181,9 @@ class AIAgent:
         normalized_provider = (provider or "").strip().lower()
         # Nous serves GPT-5.x models via its OpenAI-compatible chat
         # completions endpoint; its /v1/responses endpoint returns 404.
-        if normalized_provider == "nous":
+        # Ctrigger (U-Hermes) proxy likewise only routes /v1/chat/completions;
+        # its /v1/responses upstream returns 502 Bad Gateway.
+        if normalized_provider in ("nous", "ctrigger"):
             return False
         if normalized_provider == "copilot":
             try:

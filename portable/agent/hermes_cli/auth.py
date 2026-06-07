@@ -204,13 +204,13 @@ PROVIDER_REGISTRY: Dict[str, ProviderConfig] = {
         api_key_env_vars=("OPENAI_API_KEY",),
         base_url_env_var="OPENAI_BASE_URL",
     ),
-    "perhapz": ProviderConfig(
-        id="perhapz",
-        name="Perhapz (U-Hermes)",
+    "ctrigger": ProviderConfig(
+        id="ctrigger",
+        name="Ctrigger (U-Hermes)",
         auth_type="api_key",
-        inference_base_url="https://perhapz.top/v1",
-        api_key_env_vars=("PERHAPZ_API_KEY",),
-        base_url_env_var="PERHAPZ_BASE_URL",
+        inference_base_url="https://ctrigger.com/v1",
+        api_key_env_vars=("CTRIGGER_API_KEY",),
+        base_url_env_var="CTRIGGER_BASE_URL",
     ),
     "xai-oauth": ProviderConfig(
         id="xai-oauth",

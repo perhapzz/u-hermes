@@ -6805,9 +6805,9 @@ function _buildProviderCard(p){
     field.appendChild(row);
     body.appendChild(field);
 
-    // Perhapz-only: shortcut button to the recharge page, prefilled with the
+    // Ctrigger-only: shortcut button to the recharge page, prefilled with the
     // key the user just typed (if any) so they don't have to log in again.
-    if(p.id==='perhapz'){
+    if(p.id==='ctrigger'){
       const rechargeRow=document.createElement('div');
       rechargeRow.className='provider-card-row';
       rechargeRow.style.marginTop='6px';
@@ -6819,15 +6819,15 @@ function _buildProviderCard(p){
         const typed=(input&&input.value.trim())||'';
         if(typed){
           // User just typed a new key — prefer it without round-tripping the server.
-          window.open('https://perhapz.top/recharge?key='+encodeURIComponent(typed),'_blank','noopener');
+          window.open('https://ctrigger.com/recharge?key='+encodeURIComponent(typed),'_blank','noopener');
           return;
         }
         try{
-          const res=await api('/api/providers/perhapz/recharge-url');
-          const url=(res&&res.url)||'https://perhapz.top/recharge';
+          const res=await api('/api/providers/ctrigger/recharge-url');
+          const url=(res&&res.url)||'https://ctrigger.com/recharge';
           window.open(url,'_blank','noopener');
         }catch(err){
-          window.open('https://perhapz.top/recharge','_blank','noopener');
+          window.open('https://ctrigger.com/recharge','_blank','noopener');
         }
       };
       rechargeRow.appendChild(rechargeBtn);

@@ -17,7 +17,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-API_BASE_URL = "https://perhapz.top/v1"
+API_BASE_URL = "https://ctrigger.com/v1"
 DEFAULT_MODEL = "deepseek-v4-flash"
 
 # ---------------------------------------------------------------------------
@@ -137,12 +137,13 @@ def _write_env(env_path: Path, data: dict[str, str]) -> None:
 def bootstrap(hermes_home: Path) -> dict:
     """Generate device-bound API key and write to .env if needed.
 
-    Writes ``PERHAPZ_API_KEY`` (+ ``PERHAPZ_BASE_URL`` and
+    Writes ``CTRIGGER_API_KEY`` (+ ``CTRIGGER_BASE_URL`` and
     ``HERMES_DEFAULT_MODEL`` defaults) on first run. Older builds used
-    ``OPENAI_API_KEY`` / ``OPENAI_BASE_URL`` for the same purpose; those
-    stale entries are removed here when they match the fingerprint pattern
-    or our perhapz base URL so the Settings → Providers panel doesn't show
-    a phantom OpenAI key the user can't get rid of.
+    ``OPENAI_API_KEY`` / ``OPENAI_BASE_URL`` (or the renamed-from
+    ``PERHAPZ_*`` variants) for the same purpose; those stale entries are
+    removed here when they match the fingerprint pattern or our ctrigger
+    base URL so the Settings → Providers panel doesn't show a phantom key
+    the user can't get rid of.
     """
     env_path = hermes_home / ".env"
     env = _read_env(env_path)
@@ -151,7 +152,7 @@ def bootstrap(hermes_home: Path) -> dict:
     api_key = f"sk-{fingerprint}"
 
     # ---- One-time migration: drop legacy OPENAI_* seeded by previous builds.
-    # Only purge values that look like our fingerprint key or perhapz base URL;
+    # Only purge values that look like our fingerprint key or ctrigger base URL;
     # if the user has their own real OpenAI creds we leave them alone.
     changed = False
     legacy_key = env.get("OPENAI_API_KEY", "").strip()
@@ -161,7 +162,18 @@ def bootstrap(hermes_home: Path) -> dict:
         env.pop("OPENAI_BASE_URL", None)
         changed = True
 
-    existing_key = env.get("PERHAPZ_API_KEY", "").strip()
+    # ---- Migration: rename PERHAPZ_* -> CTRIGGER_* (brand rename).
+    # The fingerprint key is identical; we just move it under the new name.
+    legacy_perhapz_key = env.pop("PERHAPZ_API_KEY", None)
+    legacy_perhapz_url = env.pop("PERHAPZ_BASE_URL", None)
+    if legacy_perhapz_key is not None or legacy_perhapz_url is not None:
+        changed = True
+        if legacy_perhapz_key and "CTRIGGER_API_KEY" not in env:
+            env["CTRIGGER_API_KEY"] = legacy_perhapz_key
+        if legacy_perhapz_url and "CTRIGGER_BASE_URL" not in env:
+            env["CTRIGGER_BASE_URL"] = legacy_perhapz_url
+
+    existing_key = env.get("CTRIGGER_API_KEY", "").strip()
 
     if existing_key and existing_key != api_key:
         # User has configured their own key — don't touch it
@@ -178,9 +190,9 @@ def bootstrap(hermes_home: Path) -> dict:
         return {"action": "noop", "source": source}
 
     # Write or update
-    env["PERHAPZ_API_KEY"] = api_key
-    if "PERHAPZ_BASE_URL" not in env:
-        env["PERHAPZ_BASE_URL"] = API_BASE_URL
+    env["CTRIGGER_API_KEY"] = api_key
+    if "CTRIGGER_BASE_URL" not in env:
+        env["CTRIGGER_BASE_URL"] = API_BASE_URL
     if "HERMES_DEFAULT_MODEL" not in env:
         env["HERMES_DEFAULT_MODEL"] = DEFAULT_MODEL
     _write_env(env_path, env)
@@ -195,6 +207,71 @@ def bootstrap(hermes_home: Path) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Brand-rename migration: rewrite ``perhapz`` → ``ctrigger`` in config.yaml
+# ---------------------------------------------------------------------------
+
+def migrate_perhapz_to_ctrigger(hermes_home: Path) -> dict:
+    """Rewrite stored ``provider: perhapz`` to ``provider: ctrigger``.
+
+    The provider was renamed in stage-XYZ; runtime alias tables already cover
+    read paths, but the value persisted in ``config.yaml`` (under
+    ``model.provider`` and inside ``model_badges[].provider``) and in
+    ``auth.json`` (``active_provider``) keeps showing the old name to anyone
+    reading the raw file. This rewrites both files once, idempotently.
+
+    Returns a small status dict so the launcher can log what was touched.
+    Never raises: failures are swallowed so a corrupt config can't block
+    startup.
+    """
+    result = {"config_yaml": "noop", "auth_json": "noop"}
+
+    config_path = hermes_home / "config.yaml"
+    if config_path.exists():
+        try:
+            text = config_path.read_text(encoding="utf-8")
+            # Be deliberately conservative: only rewrite the exact ``provider:``
+            # field shape so we don't accidentally munge an unrelated string
+            # that happens to contain ``perhapz``.
+            new_text = text
+            import re as _re
+            new_text = _re.sub(
+                r'(^|\n)(\s*provider\s*:\s*["\']?)perhapz(["\']?\s*(?:#.*)?(?=\n|$))',
+                r'\1\2ctrigger\3',
+                new_text,
+            )
+            if new_text != text:
+                config_path.write_text(new_text, encoding="utf-8")
+                result["config_yaml"] = "migrated"
+        except Exception:
+            result["config_yaml"] = "error"
+
+    auth_path = hermes_home / "auth.json"
+    if auth_path.exists():
+        try:
+            import json as _json
+            data = _json.loads(auth_path.read_text(encoding="utf-8"))
+            mutated = False
+            if isinstance(data, dict) and data.get("active_provider") == "perhapz":
+                data["active_provider"] = "ctrigger"
+                mutated = True
+            # credential_pool keys may also bucket per-provider entries
+            pool = data.get("credential_pool") if isinstance(data, dict) else None
+            if isinstance(pool, dict) and "perhapz" in pool:
+                pool.setdefault("ctrigger", pool.pop("perhapz"))
+                mutated = True
+            if mutated:
+                auth_path.write_text(
+                    _json.dumps(data, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+                result["auth_json"] = "migrated"
+        except Exception:
+            result["auth_json"] = "error"
+
+    return result
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -205,5 +282,8 @@ if __name__ == "__main__":
     hermes_home = Path(sys.argv[1])
     hermes_home.mkdir(parents=True, exist_ok=True)
     result = bootstrap(hermes_home)
+    migration = migrate_perhapz_to_ctrigger(hermes_home)
+    if migration["config_yaml"] != "noop" or migration["auth_json"] != "noop":
+        result["perhapz_migration"] = migration
     import json
     print(json.dumps(result))

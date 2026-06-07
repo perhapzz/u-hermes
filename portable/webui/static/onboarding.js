@@ -1,4 +1,4 @@
-const ONBOARDING={status:null,step:0,steps:['system','setup','workspace','password','finish'],form:{provider:'perhapz',workspace:'',model:'',password:'',apiKey:'',baseUrl:''},active:false,probe:{status:'idle',error:null,detail:'',models:null,probedKey:''}};
+const ONBOARDING={status:null,step:0,steps:['system','setup','workspace','password','finish'],form:{provider:'ctrigger',workspace:'',model:'',password:'',apiKey:'',baseUrl:''},active:false,probe:{status:'idle',error:null,detail:'',models:null,probedKey:''}};
 
 // ── Onboarding base-URL probe (#1499) ───────────────────────────────────────
 // Probes <base_url>/models so the wizard can validate the configured endpoint
@@ -197,7 +197,7 @@ function _renderOnboardingApiKeyField(){
   const labelKey=keyOptional?'onboarding_api_key_label_optional':'onboarding_api_key_label';
   const placeholderKey=keyOptional?'onboarding_api_key_placeholder_optional':'onboarding_api_key_placeholder';
   const helpHtml=keyOptional?`<p class="onboarding-copy onboarding-api-key-help">${esc(t('onboarding_api_key_help_keyless')||'')}</p>`:'';
-  const rechargeHtml=(ONBOARDING.form.provider==='perhapz')?`<a href="https://perhapz.top/recharge?key=${encodeURIComponent(ONBOARDING.form.apiKey||'')}" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;padding:6px 16px;background:var(--accent,#4f8cff);color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:500">${esc(t('onboarding_recharge_link'))}</a>`:'';
+  const rechargeHtml=(ONBOARDING.form.provider==='ctrigger')?`<a href="https://ctrigger.com/recharge?key=${encodeURIComponent(ONBOARDING.form.apiKey||'')}" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;padding:6px 16px;background:var(--accent,#4f8cff);color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:500">${esc(t('onboarding_recharge_link'))}</a>`:'';
   return `<label class="onboarding-field" id="onboardingApiKeyField"><span>${t(labelKey)}</span><input id="onboardingApiKeyInput" type="password" value="${esc(ONBOARDING.form.apiKey||'')}" placeholder="${t(placeholderKey)}" oninput="ONBOARDING.form.apiKey=this.value" onblur="_runOnboardingProbe()"></label>${helpHtml}${rechargeHtml}`;
 }
 
@@ -419,7 +419,7 @@ function syncOnboardingWorkspaceSelect(value){
 function syncOnboardingProvider(value){
   const provider=_getOnboardingSetupProvider(value);
   ONBOARDING.form.provider=value;
-  if(value==='perhapz'&&ONBOARDING.status&&ONBOARDING.status.system&&ONBOARDING.status.system.prefilled_api_key){
+  if(value==='ctrigger'&&ONBOARDING.status&&ONBOARDING.status.system&&ONBOARDING.status.system.prefilled_api_key){
     ONBOARDING.form.apiKey=ONBOARDING.status.system.prefilled_api_key;
   }else{
     ONBOARDING.form.apiKey='';
@@ -442,12 +442,12 @@ async function loadOnboardingWizard(){
     const status=await api('/api/onboarding/status');
     ONBOARDING.status=status;
     const current=((status.setup||{}).current)||{};
-    ONBOARDING.form.provider=ONBOARDING.form.provider||current.provider||'perhapz';
+    ONBOARDING.form.provider=ONBOARDING.form.provider||current.provider||'ctrigger';
     ONBOARDING.form.workspace=(status.workspaces&&status.workspaces.last)||status.settings.default_workspace||'';
     ONBOARDING.form.model=status.settings.default_model||current.model||'';
     ONBOARDING.form.password='';
     ONBOARDING.form.apiKey='';
-    if(ONBOARDING.form.provider==='perhapz'&&status.system&&status.system.prefilled_api_key){ONBOARDING.form.apiKey=status.system.prefilled_api_key;}
+    if(ONBOARDING.form.provider==='ctrigger'&&status.system&&status.system.prefilled_api_key){ONBOARDING.form.apiKey=status.system.prefilled_api_key;}
     ONBOARDING.form.baseUrl=current.base_url||'';
     ONBOARDING.active=!status.completed;
     if(!ONBOARDING.active) return false;

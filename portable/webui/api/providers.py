@@ -635,7 +635,7 @@ print(json.dumps(_snapshot_payload(snapshot)))
 # Providers not listed here (OAuth/token-flow providers like copilot, nous,
 # openai-codex) cannot have their keys managed from the WebUI.
 _PROVIDER_ENV_VAR: dict[str, str] = {
-    "perhapz": "PERHAPZ_API_KEY",
+    "ctrigger": "CTRIGGER_API_KEY",
     "openrouter": "OPENROUTER_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
     "openai": "OPENAI_API_KEY",
@@ -1370,17 +1370,17 @@ def get_provider_quota(provider_id: str | None = None, *, refresh: bool = False)
     if provider in _ACCOUNT_USAGE_PROVIDERS:
         return _provider_account_usage_status(provider, display_name, refresh=refresh)
 
-    if provider == "perhapz":
-        usage = get_perhapz_usage()
+    if provider == "ctrigger":
+        usage = get_ctrigger_usage()
         if not usage.get("ok"):
             return {
                 "ok": False,
-                "provider": "perhapz",
+                "provider": "ctrigger",
                 "display_name": display_name,
                 "supported": True,
                 "status": usage.get("status") or "unavailable",
                 "quota": None,
-                "message": usage.get("message") or "Perhapz balance is temporarily unavailable.",
+                "message": usage.get("message") or "Ctrigger balance is temporarily unavailable.",
             }
         balance = usage.get("balance")
         today_cost = (usage.get("today") or {}).get("cost")
@@ -1388,17 +1388,17 @@ def get_provider_quota(provider_id: str | None = None, *, refresh: bool = False)
         unit = usage.get("unit") or "USD"
         return {
             "ok": True,
-            "provider": "perhapz",
+            "provider": "ctrigger",
             "display_name": display_name,
             "supported": True,
             "status": "available",
-            "label": f"Perhapz {unit} balance",
+            "label": f"Ctrigger {unit} balance",
             "quota": {
                 "limit_remaining": balance,
                 "usage": today_cost,
                 "limit": total_cost,
             },
-            "message": f"Perhapz balance: {balance} {unit} (today {today_cost} {unit}).",
+            "message": f"Ctrigger balance: {balance} {unit} (today {today_cost} {unit}).",
         }
 
     if provider != "openrouter":
@@ -2125,8 +2125,8 @@ def remove_provider_key(provider_id: str) -> dict[str, Any]:
     return result
 
 
-def get_perhapz_recharge_url() -> dict[str, Any]:
-    """Build the perhapz.top recharge URL, prefilled with the stored API key.
+def get_ctrigger_recharge_url() -> dict[str, Any]:
+    """Build the ctrigger.com recharge URL, prefilled with the stored API key.
 
     The key never leaves the server: only the fully-formed URL is returned to
     the browser. If no key is configured, returns the bare recharge URL so the
@@ -2134,28 +2134,28 @@ def get_perhapz_recharge_url() -> dict[str, Any]:
     """
     from urllib.parse import quote
 
-    key = _get_provider_api_key("perhapz")
-    base = "https://perhapz.top/recharge"
+    key = _get_provider_api_key("ctrigger")
+    base = "https://ctrigger.com/recharge"
     url = f"{base}?key={quote(key, safe='')}" if key else base
     return {"url": url, "has_key": bool(key)}
 
 
-_PERHAPZ_USAGE_URL = "https://perhapz.top/v1/usage"
+_CTRIGGER_USAGE_URL = "https://ctrigger.com/v1/usage"
 
 
-def get_perhapz_usage() -> dict[str, Any]:
-    """Fetch balance/usage stats for the configured perhapz API key.
+def get_ctrigger_usage() -> dict[str, Any]:
+    """Fetch balance/usage stats for the configured ctrigger API key.
 
-    Calls perhapz's ``/v1/usage`` endpoint server-side so the key never reaches
+    Calls ctrigger's ``/v1/usage`` endpoint server-side so the key never reaches
     the browser. Returns a small sanitized subset suitable for the provider
     card (balance + today's usage + totals).
     """
-    api_key = _get_provider_api_key("perhapz")
+    api_key = _get_provider_api_key("ctrigger")
     if not api_key:
-        return {"ok": False, "status": "no_key", "message": "No Perhapz API key configured."}
+        return {"ok": False, "status": "no_key", "message": "No Ctrigger API key configured."}
 
     req = urllib.request.Request(
-        _PERHAPZ_USAGE_URL,
+        _CTRIGGER_USAGE_URL,
         headers={
             "Authorization": f"Bearer {api_key}",
             "Accept": "application/json",
@@ -2167,9 +2167,9 @@ def get_perhapz_usage() -> dict[str, Any]:
         payload = json.loads(raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else raw)
     except urllib.error.HTTPError as exc:
         status = "invalid_key" if exc.code in (401, 403) else "unavailable"
-        return {"ok": False, "status": status, "message": f"Perhapz returned HTTP {exc.code}."}
+        return {"ok": False, "status": status, "message": f"Ctrigger returned HTTP {exc.code}."}
     except (TimeoutError, urllib.error.URLError, json.JSONDecodeError, OSError, ValueError) as exc:
-        return {"ok": False, "status": "unavailable", "message": f"Could not reach Perhapz: {exc}"}
+        return {"ok": False, "status": "unavailable", "message": f"Could not reach Ctrigger: {exc}"}
 
     if not isinstance(payload, dict):
         return {"ok": False, "status": "unavailable", "message": "Unexpected response shape."}

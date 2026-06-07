@@ -35,11 +35,11 @@ logger = logging.getLogger(__name__)
 
 _SUPPORTED_PROVIDER_SETUPS = {
     # ── U-Hermes default ──────────────────────────────────────────────
-    "perhapz": {
-        "label": "Perhapz (U-Hermes)",
-        "env_var": "PERHAPZ_API_KEY",
+    "ctrigger": {
+        "label": "Ctrigger (U-Hermes)",
+        "env_var": "CTRIGGER_API_KEY",
         "default_model": "gpt-4o",
-        "default_base_url": "https://perhapz.top/v1",
+        "default_base_url": "https://ctrigger.com/v1",
         "requires_base_url": False,
         "models": [
             # OpenAI
@@ -841,7 +841,7 @@ def _status_from_runtime(cfg: dict, imports_ok: bool) -> dict:
 
 
 def _build_setup_catalog(cfg: dict) -> dict:
-    current_provider = _extract_current_provider(cfg) or "perhapz"
+    current_provider = _extract_current_provider(cfg) or "ctrigger"
     current_model = _extract_current_model(cfg)
     current_base_url = _extract_current_base_url(cfg)
 

@@ -2686,7 +2686,7 @@ from api.run_journal import (
     read_run_events,
     stale_interrupted_event,
 )
-from api.providers import get_providers, get_provider_quota, get_provider_cost_history, set_provider_key, remove_provider_key, get_perhapz_recharge_url, get_perhapz_usage
+from api.providers import get_providers, get_provider_quota, get_provider_cost_history, set_provider_key, remove_provider_key, get_ctrigger_recharge_url, get_ctrigger_usage
 from api.onboarding import (
     apply_onboarding_setup,
     get_onboarding_status,
@@ -4129,15 +4129,15 @@ def handle_get(handler, parsed) -> bool:
     if parsed.path == "/api/providers":
         return j(handler, get_providers())
 
-    # Perhapz-only: return a recharge URL prefilled with the stored API key.
+    # Ctrigger-only: return a recharge URL prefilled with the stored API key.
     # The key itself stays on the server; only the URL is sent to the browser.
-    if parsed.path == "/api/providers/perhapz/recharge-url":
-        return j(handler, get_perhapz_recharge_url())
+    if parsed.path == "/api/providers/ctrigger/recharge-url":
+        return j(handler, get_ctrigger_recharge_url())
 
-    # Perhapz-only: proxy /v1/usage so the browser can show balance without
+    # Ctrigger-only: proxy /v1/usage so the browser can show balance without
     # ever holding the API key.
-    if parsed.path == "/api/providers/perhapz/usage":
-        return j(handler, get_perhapz_usage())
+    if parsed.path == "/api/providers/ctrigger/usage":
+        return j(handler, get_ctrigger_usage())
 
     # ── Plugins/hooks visibility (read-only, no callback/source internals) ──
     if parsed.path == "/api/plugins":
