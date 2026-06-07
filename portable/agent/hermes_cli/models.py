@@ -972,10 +972,6 @@ _PROVIDER_LABELS["custom"] = "Custom endpoint"  # special case: not a named prov
 
 
 _PROVIDER_ALIASES = {
-    # U-Hermes brand rename (perhapz → ctrigger). Mirrors the WebUI alias
-    # so the agent resolves a legacy `provider: perhapz` model entry to the
-    # current ctrigger ProviderConfig.
-    "perhapz": "ctrigger",
     "glm": "zai",
     "z-ai": "zai",
     "z.ai": "zai",

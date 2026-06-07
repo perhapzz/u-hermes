@@ -753,10 +753,6 @@ _PROVIDER_DISPLAY = {
 # not on ``sys.path`` (CI, installs without hermes-agent cloned
 # alongside the WebUI).
 _PROVIDER_ALIASES = {
-    # U-Hermes brand rename (perhapz → ctrigger). Keeps legacy config.yaml /
-    # auth.json values with `provider: perhapz` resolving to the new id so
-    # the Providers panel, quota lookup, and active-provider sort all match.
-    "perhapz": "ctrigger",
     "glm": "zai",
     "z-ai": "zai",
     "z.ai": "zai",

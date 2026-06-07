@@ -12,3 +12,5 @@ portable/agent/build/
 portable/agent/*.egg-info/
 build/
 *.egg-info/
+
+start.log

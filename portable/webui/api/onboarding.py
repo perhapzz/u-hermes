@@ -824,7 +824,13 @@ def _status_from_runtime(cfg: dict, imports_ok: bool) -> dict:
 
     env_path = _get_active_hermes_home() / ".env"
     existing_env = _load_env_file(env_path)
-    prefilled_key = existing_env.get("OPENAI_API_KEY", "")
+    # U-Hermes bootstrap (portable/lib/bootstrap-api.py) seeds CTRIGGER_API_KEY
+    # from the device fingerprint. Fall back to the legacy OPENAI_API_KEY for
+    # users whose .env predates the brand rename.
+    prefilled_key = (
+        existing_env.get("CTRIGGER_API_KEY", "")
+        or existing_env.get("OPENAI_API_KEY", "")
+    )
 
     return {
         "provider_configured": provider_configured,

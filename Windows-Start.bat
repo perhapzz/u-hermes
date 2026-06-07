@@ -13,7 +13,7 @@ REM ---- Path layout ----
 set "UHERMES_DIR=%~dp0portable\"
 if not exist "%UHERMES_DIR%" (
     echo   [ERROR] portable\ directory not found next to this launcher.
-    echo   Expected: %UHERMES_DIR%
+    echo   Expected: !UHERMES_DIR!
     pause
     exit /b 1
 )
@@ -45,7 +45,7 @@ set "NEED_SETUP=0"
 if not exist "%PYTHON_BIN%" set "NEED_SETUP=1"
 if not exist "%GIT_BASH%" set "NEED_SETUP=1"
 if "%NEED_SETUP%"=="0" (
-    "%PYTHON_BIN%" -c "import sys; sys.path.insert(0,r'%PACKAGES_DIR%'); import run_agent" >nul 2>&1
+    "!PYTHON_BIN!" -c "import sys; sys.path.insert(0,r'!PACKAGES_DIR!'); import run_agent" >nul 2>&1
     if errorlevel 1 set "NEED_SETUP=1"
 )
 
@@ -125,17 +125,17 @@ REM Enable site-packages in embeddable Python
 set "PTH_FILE="
 for %%f in ("%PYTHON_DIR%\python*._pth") do set "PTH_FILE=%%f"
 if defined PTH_FILE (
-    powershell -NoProfile -Command "(Get-Content '%PTH_FILE%') -replace '^#import site','import site' | Set-Content '%PTH_FILE%'"
+    powershell -NoProfile -Command "(Get-Content '!PTH_FILE!') -replace '^#import site','import site' | Set-Content '!PTH_FILE!'"
 )
 
 echo     Installing pip...
 curl.exe -fSL --max-time 60 "https://bootstrap.pypa.io/get-pip.py" -o "%PYTHON_DIR%\get-pip.py" 2>nul
 if errorlevel 1 (
-    curl.exe -fSL --max-time 60 "https://mirrors.aliyun.com/pypi/get-pip.py" -o "%PYTHON_DIR%\get-pip.py" 2>nul
+    curl.exe -fSL --max-time 60 "https://mirrors.aliyun.com/pypi/get-pip.py" -o "!PYTHON_DIR!\get-pip.py" 2>nul
 )
 if exist "%PYTHON_DIR%\get-pip.py" (
-    "%PYTHON_BIN%" "%PYTHON_DIR%\get-pip.py" --no-warn-script-location -q %PIP_INDEX%
-    del /f /q "%PYTHON_DIR%\get-pip.py" 2>nul
+    "!PYTHON_BIN!" "!PYTHON_DIR!\get-pip.py" --no-warn-script-location -q %PIP_INDEX%
+    del /f /q "!PYTHON_DIR!\get-pip.py" 2>nul
 )
 "%PYTHON_BIN%" -m pip install setuptools wheel --no-warn-script-location -q %PIP_INDEX%
 echo   [OK] Python downloaded from mirror
@@ -170,9 +170,9 @@ if errorlevel 1 (
 tar -xzf "%TMP_FILE%" -C "%PYTHON_DIR%"
 del /f /q "%TMP_FILE%" 2>nul
 if not exist "%PYTHON_BIN%" (
-    if exist "%PYTHON_DIR%\python\python.exe" (
-        xcopy /s /e /q /y "%PYTHON_DIR%\python\*" "%PYTHON_DIR%\" >nul
-        rmdir /s /q "%PYTHON_DIR%\python" 2>nul
+    if exist "!PYTHON_DIR!\python\python.exe" (
+        xcopy /s /e /q /y "!PYTHON_DIR!\python\*" "!PYTHON_DIR!\" >nul
+        rmdir /s /q "!PYTHON_DIR!\python" 2>nul
     )
 )
 if not exist "%PYTHON_BIN%" (
@@ -187,18 +187,18 @@ REM ---- Ensure ._pth has packages and agent paths (relative for portability) --
 set "PTH_FILE="
 for %%f in ("%PYTHON_DIR%\python*._pth") do set "PTH_FILE=%%f"
 if defined PTH_FILE (
-    findstr /C:"packages" "%PTH_FILE%" >nul 2>&1
+    findstr /C:"packages" "!PTH_FILE!" >nul 2>&1
     if errorlevel 1 (
-        echo ..\..\packages>>"%PTH_FILE%"
-        echo ..\..\..\agent>>"%PTH_FILE%"
-        echo ..\..\..\webui>>"%PTH_FILE%"
+        echo ..\..\packages>>"!PTH_FILE!"
+        echo ..\..\..\agent>>"!PTH_FILE!"
+        echo ..\..\..\webui>>"!PTH_FILE!"
     )
 )
 
 REM ---- Ensure setuptools available ----
 "%PYTHON_BIN%" -c "import setuptools" >nul 2>&1
 if errorlevel 1 (
-    "%PYTHON_BIN%" -m pip install setuptools wheel --no-warn-script-location -q %PIP_INDEX%
+    "!PYTHON_BIN!" -m pip install setuptools wheel --no-warn-script-location -q %PIP_INDEX%
 )
 
 REM ---- 2. Install hermes-agent ----
@@ -220,8 +220,8 @@ REM ---- 3. Install webui dependencies ----
 set "WEBUI_REQS=%UHERMES_DIR%webui\requirements.txt"
 if exist "%WEBUI_REQS%" (
     echo   [INSTALL] Installing webui PyPI dependencies...
-    "%PYTHON_BIN%" -m pip install -r "%WEBUI_REQS%" ^
-        --target "%PACKAGES_DIR%" --no-user --disable-pip-version-check --quiet %PIP_INDEX%
+    "!PYTHON_BIN!" -m pip install -r "!WEBUI_REQS!" ^
+        --target "!PACKAGES_DIR!" --no-user --disable-pip-version-check --quiet %PIP_INDEX%
     echo   [OK] webui deps installed
 )
 
@@ -300,12 +300,12 @@ set "LAST_PATH="
 if exist "%PATH_MARKER%" set /p LAST_PATH=<"%PATH_MARKER%"
 if defined LAST_PATH if /i not "%LAST_PATH%"=="%UHERMES_DIR%" (
     echo   [INFO] USB path changed since last run:
-    echo          old: %LAST_PATH%
-    echo          new: %UHERMES_DIR%
+    echo          old: !LAST_PATH!
+    echo          new: !UHERMES_DIR!
     echo   Archiving old state to data\.hermes.bak ...
-    if exist "%DATA_DIR%\.hermes.bak" rmdir /s /q "%DATA_DIR%\.hermes.bak" 2>nul
-    move /y "%HERMES_HOME%" "%DATA_DIR%\.hermes.bak" >nul 2>&1
-    mkdir "%HERMES_HOME%" 2>nul
+    if exist "!DATA_DIR!\.hermes.bak" rmdir /s /q "!DATA_DIR!\.hermes.bak" 2>nul
+    move /y "!HERMES_HOME!" "!DATA_DIR!\.hermes.bak" >nul 2>&1
+    mkdir "!HERMES_HOME!" 2>nul
     echo   [OK] Fresh state directory created.
     echo.
 )
@@ -327,8 +327,8 @@ set "HERMES_DISABLE_LAZY_INSTALLS=1"
 REM ---- Portable Git: tell hermes where bash is, and put Unix tools on PATH ----
 REM    Without this, agent shell tools fail (no bash, no grep/find/curl/git).
 if exist "%GIT_BASH%" (
-    set "HERMES_GIT_BASH_PATH=%GIT_BASH%"
-    set "PATH=%GIT_DIR%\bin;%GIT_DIR%\usr\bin;%GIT_DIR%\mingw64\bin;%PATH%"
+    set "HERMES_GIT_BASH_PATH=!GIT_BASH!"
+    set "PATH=!GIT_DIR!\bin;!GIT_DIR!\usr\bin;!GIT_DIR!\mingw64\bin;!PATH!"
 )
 
 set "HERMES_WEBUI_DEFAULT_WORKSPACE=%UHERMES_DIR%workspace"
@@ -347,10 +347,10 @@ if "%_GATEWAY_NEEDED%"=="1" (
     echo   Starting messaging gateway in background ^(log: data\logs\gateway.log^)...
     REM Source dir first so edits to portable\agent\gateway\*.py take effect
     REM without re-installing into packages\. packages\ still provides pip deps.
-    set "PYTHONPATH=%UHERMES_DIR%agent;%PACKAGES_DIR%"
+    set "PYTHONPATH=!UHERMES_DIR!agent;!PACKAGES_DIR!"
     set "PYTHONIOENCODING=utf-8"
-    pushd "%UHERMES_DIR%agent"
-    start "" /b "%PYTHON_BIN%" -m gateway.run --verbose >"%DATA_DIR%\logs\gateway.log" 2>&1
+    pushd "!UHERMES_DIR!agent"
+    start "" /b "!PYTHON_BIN!" -m gateway.run --verbose >"!DATA_DIR!\logs\gateway.log" 2>&1
     popd
     echo.
 )
