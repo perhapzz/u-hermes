@@ -1727,6 +1727,13 @@ function applyBotName(){
   await renderSessionList();
   await _workspaceListReady;
   await _onboardingReady;
+  // U-Hermes auto-update prompt (fire-and-forget). Skipped silently if the
+  // user is mid-onboarding (modal would stack on top of wizard), if updates
+  // are disabled, or if /api/uhermes/update-check reports already-up-to-date.
+  // Implementation lives in panels.js → checkUhermesUpdatesAtBoot().
+  if(_bootSettings.onboarding_completed&&typeof checkUhermesUpdatesAtBoot==='function'){
+    setTimeout(()=>{try{checkUhermesUpdatesAtBoot();}catch(_){ }},800);
+  }
   _initResizePanels();
   // Workspace panel restore happens AFTER loadSession so we know if
   // the session has a workspace — prevents the snap-open-then-closed flash (#576).

@@ -66,15 +66,48 @@ def _find_git_binary() -> str | None:
     return shutil.which("git")
 
 
-def _run_git(args, cwd, *, git_bin: str, timeout: int = 60):
+def _git_env(*, no_prompt: bool = False) -> dict:
+    """Build a clean environment for git subprocesses.
+
+    - Strips GIT_DIR / GIT_WORK_TREE so git discovers the repo from ``cwd``
+      (the Windows launcher used to export a bat var literally named GIT_DIR
+      pointing at PortableGit, which git misread as the repo → "not a git
+      repository").
+    - When *no_prompt* is set, fully disables interactive auth so a private /
+      rate-limited remote can NEVER pop a Git Credential Manager dialog or
+      block on a terminal prompt. Read-only check operations use this so they
+      either succeed anonymously or fail fast.
+    """
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in ("GIT_DIR", "GIT_WORK_TREE")
+    }
+    if no_prompt:
+        env["GIT_TERMINAL_PROMPT"] = "0"   # never prompt on the terminal
+        env["GCM_INTERACTIVE"] = "Never"   # Git Credential Manager: no GUI
+        env["GIT_ASKPASS"] = ""            # disable any askpass helper
+        env["SSH_ASKPASS"] = ""
+    return env
+
+
+def _run_git(args, cwd, *, git_bin: str, timeout: int = 60, no_prompt: bool = False):
     """Run a git command; return (combined output, ok)."""
     try:
+        env = _git_env(no_prompt=no_prompt)
+        run_args = [git_bin]
+        if no_prompt:
+            # Belt-and-suspenders: also neutralise any configured credential
+            # helper for THIS invocation only (does not touch global config).
+            run_args += ["-c", "credential.helper="]
+        run_args += list(args)
         r = subprocess.run(
-            [git_bin] + list(args),
+            run_args,
             cwd=str(cwd),
             capture_output=True,
             text=True,
             timeout=timeout,
+            env=env,
         )
         out = (r.stdout or "").strip()
         err = (r.stderr or "").strip()
@@ -297,3 +330,103 @@ def update_from_gitee(gitee_url: str | None = None) -> dict:
         return _update_via_fresh_clone(root, git_bin, url)
     finally:
         _apply_lock.release()
+
+
+# ---------------------------------------------------------------------------
+# Check-only: does Gitee have a newer commit than what we have locally?
+# Used by the launcher / WebUI boot to show an "Update available" modal
+# without actually downloading anything.
+# ---------------------------------------------------------------------------
+
+def _ls_remote_head(url: str, branch: str, git_bin: str, timeout: int = 15) -> str:
+    """Return the full 40-char SHA of *branch* on the remote *url*, or ''."""
+    try:
+        r = subprocess.run(
+            [git_bin, "-c", "credential.helper=", "ls-remote", "--heads", url, branch],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=_git_env(no_prompt=True),
+        )
+        if r.returncode != 0:
+            return ""
+        # Output format: "<sha>\trefs/heads/<branch>"
+        line = (r.stdout or "").strip().splitlines()
+        if not line:
+            return ""
+        sha = line[0].split("\t", 1)[0].strip()
+        return sha if len(sha) == 40 else ""
+    except (subprocess.TimeoutExpired, OSError):
+        return ""
+
+
+def check_for_updates(gitee_url: str | None = None) -> dict:
+    """Compare local HEAD to gitee/<branch> HEAD without modifying anything.
+
+    Returns a dict with:
+        ok            — bool, whether the check itself completed
+        update_available — bool, True iff remote_sha != local_sha
+        local_sha       — short SHA of local HEAD (or None)
+        remote_sha      — short SHA of remote HEAD (or None)
+        local_sha_full  — 40-char SHA (used by frontend skip logic)
+        remote_sha_full — 40-char SHA (skip-this-version comparison key)
+        branch          — branch name probed
+        remote_url      — URL probed
+        message         — human-readable status (only set on failure)
+    """
+    url = (gitee_url or os.environ.get("UHERMES_GITEE_URL") or DEFAULT_GITEE_URL).strip()
+    if not url:
+        return {"ok": False, "update_available": False, "message": "No Gitee URL configured."}
+
+    git_bin = _find_git_binary()
+    if not git_bin:
+        return {
+            "ok": False,
+            "update_available": False,
+            "message": "git executable not found; cannot check for updates.",
+        }
+
+    root = _uhermes_root()
+    if not root.exists() or not (root / ".git").exists():
+        # Non-git deployment — we have no local SHA to compare against.
+        # The "Update from Gitee" button still works (clone-copy fallback),
+        # so we just report that we can't tell.
+        return {
+            "ok": False,
+            "update_available": False,
+            "message": "Local install is not a git checkout; cannot detect updates.",
+        }
+
+    branch = _current_branch(root, git_bin)
+    local_full, ok_local = _run_git(["rev-parse", "HEAD"], root, git_bin=git_bin, timeout=10)
+    if not ok_local or len(local_full) != 40:
+        return {
+            "ok": False,
+            "update_available": False,
+            "message": "Could not resolve local HEAD.",
+            "detail": str(local_full)[:300],
+            "git_bin": git_bin,
+            "root": str(root),
+            "branch": branch,
+        }
+
+    remote_full = _ls_remote_head(url, branch, git_bin)
+    if not remote_full:
+        return {
+            "ok": False,
+            "update_available": False,
+            "branch": branch,
+            "remote_url": url,
+            "message": f"Could not reach Gitee or branch '{branch}' missing on remote.",
+        }
+
+    return {
+        "ok": True,
+        "update_available": local_full != remote_full,
+        "local_sha": local_full[:7],
+        "remote_sha": remote_full[:7],
+        "local_sha_full": local_full,
+        "remote_sha_full": remote_full,
+        "branch": branch,
+        "remote_url": url,
+    }

@@ -4784,6 +4784,23 @@ def handle_get(handler, parsed) -> bool:
         from api.commands import list_commands
         return j(handler, {"commands": list_commands()})
 
+    # U-Hermes-specific lightweight update check (git ls-remote against Gitee).
+    # Does NOT download anything — only compares local HEAD with remote HEAD so
+    # the WebUI can show an "Update available" modal at boot.
+    if parsed.path == "/api/uhermes/update-check":
+        settings = load_settings()
+        if not settings.get("check_for_updates", True):
+            return j(handler, {"disabled": True, "ok": False, "update_available": False})
+        from api.uhermes_update import check_for_updates
+
+        qs = parse_qs(parsed.query)
+        gitee_url = (qs.get("gitee_url", [""])[0] or "").strip() or None
+        result = check_for_updates(gitee_url)
+        # Surface the user's "skip this version" SHA so the frontend can decide
+        # whether to actually show the modal without a second round trip.
+        result["skipped_sha"] = settings.get("skipped_update_sha") or ""
+        return j(handler, result)
+
     if parsed.path == "/api/updates/check":
         settings = load_settings()
         if not settings.get("check_for_updates", True):

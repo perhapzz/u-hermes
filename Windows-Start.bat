@@ -25,8 +25,8 @@ set "DATA_DIR=%UHERMES_DIR%data"
 set "HERMES_HOME=%DATA_DIR%\.hermes"
 set "PYTHON_DIR=%RUNTIME_DIR%\python-win-x64"
 set "PYTHON_BIN=%PYTHON_DIR%\python.exe"
-set "GIT_DIR=%RUNTIME_DIR%\git-win-x64"
-set "GIT_BASH=%GIT_DIR%\bin\bash.exe"
+set "PGIT_DIR=%RUNTIME_DIR%\git-win-x64"
+set "GIT_BASH=%PGIT_DIR%\bin\bash.exe"
 
 set "PYTHON_TAG=20260510"
 set "PYTHON_VERSION=3.11.15"
@@ -259,9 +259,9 @@ if errorlevel 1 (
 )
 
 :pg_ok
-if not exist "%GIT_DIR%" mkdir "%GIT_DIR%" 2>nul
+if not exist "%PGIT_DIR%" mkdir "%PGIT_DIR%" 2>nul
 echo     Extracting...
-"%TMP_PG%" -o"%GIT_DIR%" -y >nul
+"%TMP_PG%" -o"%PGIT_DIR%" -y >nul
 del /f /q "%TMP_PG%" 2>nul
 if exist "%GIT_BASH%" (
     echo   [OK] PortableGit installed
@@ -328,7 +328,7 @@ REM ---- Portable Git: tell hermes where bash is, and put Unix tools on PATH ---
 REM    Without this, agent shell tools fail (no bash, no grep/find/curl/git).
 if exist "%GIT_BASH%" (
     set "HERMES_GIT_BASH_PATH=!GIT_BASH!"
-    set "PATH=!GIT_DIR!\bin;!GIT_DIR!\usr\bin;!GIT_DIR!\mingw64\bin;!PATH!"
+    set "PATH=!PGIT_DIR!\bin;!PGIT_DIR!\usr\bin;!PGIT_DIR!\mingw64\bin;!PATH!"
 )
 
 set "HERMES_WEBUI_DEFAULT_WORKSPACE=%UHERMES_DIR%workspace"

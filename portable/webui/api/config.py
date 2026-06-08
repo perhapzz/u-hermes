@@ -4817,6 +4817,7 @@ _SETTINGS_DEFAULTS = {
     "auto_title_refresh_every": "0",  # adaptive title refresh: 0=off, 5/10/20=every N exchanges
     "busy_input_mode": "queue",  # behavior when sending while agent is running: queue | interrupt | steer
     "password_hash": None,  # PBKDF2-HMAC-SHA256 hash; None = auth disabled
+    "skipped_update_sha": "",  # U-Hermes: 40-char full SHA the user clicked "skip this version" on
 }
 _SETTINGS_LEGACY_DROP_KEYS = {"assistant_language", "bubble_layout", "default_model"}
 _SETTINGS_THEME_VALUES = {"light", "dark", "system"}
@@ -5013,6 +5014,15 @@ def save_settings(settings: dict) -> dict:
                 not isinstance(v, str) or not _SETTINGS_LANG_RE.match(v)
             ):
                 continue
+            # Validate skipped_update_sha: empty (= unset) or 40-char lowercase hex.
+            if k == "skipped_update_sha":
+                if v is None:
+                    v = ""
+                if not isinstance(v, str):
+                    continue
+                v = v.strip().lower()
+                if v and (len(v) != 40 or any(c not in "0123456789abcdef" for c in v)):
+                    continue
             # Validate hidden_tabs: must be a list of non-empty strings.
             # Belt-and-suspenders strip of "chat" and "settings" so a
             # malicious POST cannot lock the user out of the always-visible

@@ -7225,6 +7225,101 @@ async function checkUpdatesNow(){
 // re-launch the *-Start script to load the new code. The button is wired in
 // index.html (System section of Settings) and the backend lives in
 // api/uhermes_update.py.
+
+// Build + show the boot-time "update available" modal.
+// Three actions:
+//   - Update now      → calls updateFromGitee() (existing manual button flow)
+//   - Skip this version → POST settings.skipped_update_sha = remote_sha_full
+//   - Remind me later → just close, ask again next launch
+function _renderUpdateAvailableModal(info){
+  if(!info||!info.remote_sha_full) return;
+  // Avoid stacking
+  const existing=document.getElementById('uhermesUpdateModal');
+  if(existing){try{existing.remove();}catch(_){ }}
+  const overlay=document.createElement('div');
+  overlay.id='uhermesUpdateModal';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px';
+  const card=document.createElement('div');
+  card.style.cssText='background:var(--bg);color:var(--text);border:1px solid var(--border2);border-radius:10px;max-width:520px;width:100%;box-shadow:0 12px 32px rgba(0,0,0,0.4);overflow:hidden';
+  const header=document.createElement('div');
+  header.style.cssText='padding:14px 18px;border-bottom:1px solid var(--border2);font-weight:600;font-size:15px';
+  header.textContent=t('update_available_title')||'Update available';
+  const body=document.createElement('div');
+  body.style.cssText='padding:16px 18px;font-size:13px;line-height:1.55;color:var(--text2)';
+  const bodyTpl=t('update_available_body')
+    ||'A new version of U-Hermes is available on Gitee ({remote} ← {local}, branch {branch}). Update now or skip this version?';
+  body.textContent=bodyTpl
+    .replace('{remote}',info.remote_sha||'')
+    .replace('{local}',info.local_sha||'')
+    .replace('{branch}',info.branch||'master');
+  const footer=document.createElement('div');
+  footer.style.cssText='padding:12px 18px 16px;display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;border-top:1px solid var(--border2)';
+  const _close=()=>{try{overlay.remove();}catch(_){}};
+  const btnLater=document.createElement('button');
+  btnLater.type='button';
+  btnLater.className='secondary';
+  btnLater.style.cssText='padding:8px 14px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--text);cursor:pointer';
+  btnLater.textContent=t('update_available_later')||'Remind me later';
+  btnLater.addEventListener('click',_close);
+  const btnSkip=document.createElement('button');
+  btnSkip.type='button';
+  btnSkip.style.cssText='padding:8px 14px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--text);cursor:pointer';
+  btnSkip.textContent=t('update_available_skip_version')||'Skip this version';
+  btnSkip.addEventListener('click',async()=>{
+    btnSkip.disabled=true;
+    try{
+      await api('/api/settings',{method:'POST',body:JSON.stringify({skipped_update_sha:info.remote_sha_full})});
+    }catch(e){console.warn('[update-check] skip failed',e);}
+    _close();
+  });
+  const btnNow=document.createElement('button');
+  btnNow.type='button';
+  btnNow.className='primary';
+  btnNow.style.cssText='padding:8px 14px;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;font-weight:600';
+  btnNow.textContent=t('update_available_update_now')||'Update now';
+  btnNow.addEventListener('click',()=>{
+    _close();
+    // updateFromGitee() looks up #btnUpdateFromGitee + #checkUpdatesStatus
+    // which always live in the Settings tab markup — works regardless of
+    // which tab is currently visible. The user can switch to Settings to
+    // watch the spinner/status if they want.
+    setTimeout(()=>{try{updateFromGitee();}catch(e){console.warn('[update-check] updateFromGitee failed',e);}},80);
+  });
+  footer.appendChild(btnLater);
+  footer.appendChild(btnSkip);
+  footer.appendChild(btnNow);
+  card.appendChild(header);
+  card.appendChild(body);
+  card.appendChild(footer);
+  overlay.appendChild(card);
+  overlay.addEventListener('click',ev=>{if(ev.target===overlay) _close();});
+  document.body.appendChild(overlay);
+}
+
+// Called from boot.js after settings + onboarding settle.
+// Silent on failure (offline / no git / settings disabled).
+async function checkUhermesUpdatesAtBoot(){
+  try{
+    // One prompt per browser tab session. "Remind me later" closes the
+    // modal but doesn't store anything server-side; the user will see it
+    // again the next time they launch U-Hermes. Within the same tab session
+    // we don't re-show it to avoid being annoying after refresh.
+    if(sessionStorage.getItem('hermes-uhermes-update-checked')==='1') return;
+    let settings={};
+    try{settings=(typeof _bootSettings==='object'&&_bootSettings)||{};}catch(_){ }
+    if(settings.check_for_updates===false) return;
+    const info=await api('/api/uhermes/update-check');
+    sessionStorage.setItem('hermes-uhermes-update-checked','1');
+    if(!info||info.disabled||!info.ok||!info.update_available) return;
+    const skip=info.skipped_sha||'';
+    if(skip&&skip===info.remote_sha_full) return;
+    _renderUpdateAvailableModal(info);
+  }catch(e){
+    // Network errors, offline-mode etc. are non-fatal.
+    console.debug('[update-check]',e&&e.message||e);
+  }
+}
+
 async function updateFromGitee(){
   const btn=$('btnUpdateFromGitee');
   const label=$('updateGiteeLabel');

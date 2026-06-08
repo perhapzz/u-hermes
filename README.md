@@ -2,6 +2,10 @@
 
 > **把 Hermes AI Agent 做成 U 盘 — 插上就能用**
 
+> **许可证**：本项目采用 [Business Source License 1.1](./LICENSE)。
+> 个人学习、测试、评估等**非生产用途免费**；任何**商业用途需先获得作者授权**。
+> 自 **2030-06-09** 起，本许可下发布的版本将自动转为 **GPL-2.0-or-later** 开源协议。
+
 参考 [U-Claw](https://github.com/dongsheng123132/u-claw) 的模式，将 [hermes-agent](https://github.com/NousResearch/hermes-agent) + [hermes-webui](https://github.com/NousResearch/hermes-webui) 打包成便携版。
 
 ## 快速开始
@@ -48,6 +52,22 @@ u-hermes/                       # = U 盘根目录
 | **一键启动** | `Mac-Start.command` | `Mac-Start.command` | `Windows-Start.bat` |
 
 > 首次启动会自动下载 Python 运行时和依赖；之后所有运行都是直接启动。
+
+## 许可证 / License
+
+本项目采用 **Business Source License 1.1 (BSL 1.1)**，完整条款见 [LICENSE](./LICENSE)。
+
+- ✅ **非生产用途免费**：个人使用、学习、评估、测试可免费使用、修改、再分发。
+- ⚠️ **商业用途需授权**：任何生产环境使用，或由商业主体用于商业产品 / 服务的场景，
+  须先向作者 **perhapzz** 取得单独的商业许可。
+- 🕓 **到期自动开源**：自 **2030-06-09**（Change Date）起，在本许可下发布的对应版本
+  将自动转为 **GPL-2.0-or-later** 协议。
+
+商业授权与合作请通过 Gitee Issues 联系：
+https://gitee.com/phzbbbbbbbb/u-hermes/issues
+
+> 注意：BSL 不是 OSI 认可的开源协议，但到期后会自动转为开源。
+> 本仓库打包的 `hermes-agent` / `hermes-webui` 等第三方组件各自保留其原始许可证。
 > Start 启动器会自动启动 WebUI；若配置了飞书 / 微信凭证，消息网关也会在后台一起拉起。
 
 ## 接入飞书 / 微信
