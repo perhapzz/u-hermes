@@ -1271,22 +1271,42 @@ const _liveModelCache={};
 // preventing premature fallback to the first static model (#1169).
 const _liveModelFetchPending=new Set();
 
-function _addLiveModelsToSelect(provider, models, sel){
+function _addLiveModelsToSelect(provider, models, sel, opts){
   if(!provider||!models||!models.length||!sel) return 0;
+  const replace=!!(opts&&opts.replace);
   const currentVal=sel.value;
   let providerGroup=null;
-  for(const og of sel.querySelectorAll('optgroup')){
-    if(og.dataset.provider&&og.dataset.provider===provider){
-      providerGroup=og; break;
-    }
-    if(og.label&&og.label.toLowerCase().includes(provider.toLowerCase())){
-      providerGroup=og; break;
+  // Prefer the dedicated live optgroup we tag with data-provider so refreshes
+  // operate on the same container instead of bleeding into static groups (#1573).
+  for(const og of sel.querySelectorAll('optgroup[data-provider]')){
+    if(og.dataset.provider===provider){ providerGroup=og; break; }
+  }
+  // Backwards-compat: an older render may have created a live group without
+  // the marker. Adopt it (and tag it) so we don't end up with two live groups.
+  if(!providerGroup){
+    for(const og of sel.querySelectorAll('optgroup')){
+      if(og.label && og.label.toLowerCase()===(provider.toLowerCase()+' (live)')){
+        providerGroup=og;
+        providerGroup.dataset.provider=provider;
+        break;
+      }
     }
   }
   if(!providerGroup){
     providerGroup=document.createElement('optgroup');
     providerGroup.label=provider.charAt(0).toUpperCase()+provider.slice(1)+' (live)';
+    providerGroup.dataset.provider=provider;
     sel.appendChild(providerGroup);
+  } else if(replace){
+    // Drop every previously-fetched live option for this provider so a fresh
+    // fetch that returns a different model set doesn't leave stale entries
+    // (e.g. an old default like deepseek-v4-flash hanging around after the
+    // provider's live list switched to the claude family) (#1573).
+    while(providerGroup.firstChild){
+      const opt=providerGroup.firstChild;
+      if(opt && opt.value && _dynamicModelLabels) delete _dynamicModelLabels[opt.value];
+      providerGroup.removeChild(opt);
+    }
   }
   const existingIds=new Set([...sel.options].map(o=>o.value));
   // Normalized dedup: strip one @provider: prefix and namespace so
@@ -1351,7 +1371,7 @@ async function _fetchLiveModels(provider, sel, opts){
     const data=await _liveRes.json();
     if(!data.models||!data.models.length) return;
     _liveModelCache[provider]=data.models;
-    const added=_addLiveModelsToSelect(provider,data.models,sel);
+    const added=_addLiveModelsToSelect(provider,data.models,sel,{replace:force});
     if(added>0){
       if(typeof syncModelChip==='function') syncModelChip();
       // If the visual dropdown is open, re-render it so the newly fetched

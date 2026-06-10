@@ -8435,6 +8435,10 @@ def _handle_live_models(handler, parsed):
             return j(handler, payload)
 
         # Delegate to the agent's live-fetch + fallback resolver.
+        # Diagnostic trace lives across all fallback branches; included in
+        # the response when ?debug=1 is requested.
+        _trace: list[str] = []
+
         # provider_model_ids() tries live endpoints first and falls back to
         # the static _PROVIDER_MODELS list — it never raises.
         try:
@@ -8446,8 +8450,15 @@ def _handle_live_models(handler, parsed):
             if _agent_dir not in _sys.path:
                 _sys.path.insert(0, _agent_dir)
             from hermes_cli.models import provider_model_ids as _pmi
+            try:
+                _hcli_models_mod = _sys.modules.get("hermes_cli.models")
+                _trace.append(f"hermes_cli.models from {getattr(_hcli_models_mod, '__file__', '?')}")
+            except Exception:
+                pass
             ids = _pmi(provider)
+            _trace.append(f"_pmi({provider}) -> n={len(ids)} sample={ids[:5]}")
         except Exception as _import_err:
+            _trace.append(f"_pmi_import_FAIL {type(_import_err).__name__}: {_import_err}")
             logger.debug("provider_model_ids import failed for %s: %s", provider, _import_err)
             ids = []
 
@@ -8611,7 +8622,6 @@ def _handle_live_models(handler, parsed):
         # via resolve_api_key_provider_credentials() so .env-only setups work.
         # Diagnostic trace is built unconditionally (cheap) and returned in
         # the JSON when the caller adds ?debug=1.
-        _trace: list[str] = []
         if not ids:
             _trace.append(f"enter_fallback provider={provider}")
             try:
@@ -8739,8 +8749,12 @@ def _handle_live_models(handler, parsed):
             return label
 
         models_out = [{"id": mid, "label": _make_label(mid)} for mid in ids if mid]
-        return _finish({"provider": provider, "models": models_out,
-                        "count": len(models_out)})
+        _debug = (qs.get("debug", [""])[0] or "").strip().lower() in ("1", "true", "yes")
+        _final_payload: dict = {"provider": provider, "models": models_out,
+                                "count": len(models_out)}
+        if _debug:
+            _final_payload["_trace"] = _trace
+        return _finish(_final_payload)
 
     except Exception as _e:
         logger.debug("_handle_live_models failed for %s: %s", provider, _e)
