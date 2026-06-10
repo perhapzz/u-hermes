@@ -4840,7 +4840,41 @@ def handle_get(handler, parsed) -> bool:
             )
         from api.updates import check_for_updates
 
-        return j(handler, check_for_updates(force=force, include_agent=include_agent_updates))
+        result = check_for_updates(force=force, include_agent=include_agent_updates)
+        # U-Hermes is a single vendored repo (portable/webui and portable/agent
+        # are NOT independent git checkouts), so the upstream per-component
+        # check returns {"webui": null, "agent": null} and the Settings panel
+        # then shows "up to date" even when the parent u-hermes repo is behind
+        # Gitee. Fall back to the uhermes_update probe and synthesize webui +
+        # agent entries pointing at the parent repo so the existing frontend
+        # logic (which looks for info.behind > 0) lights up correctly.
+        try:
+            if isinstance(result, dict) and result.get("webui") is None and result.get("agent") is None:
+                from api.uhermes_update import check_for_updates as _uh_check, DEFAULT_GITEE_URL
+
+                uh = _uh_check()
+                if isinstance(uh, dict) and uh.get("ok") and uh.get("local_sha_full") and uh.get("remote_sha_full"):
+                    behind = 1 if uh.get("update_available") else 0
+                    entry = {
+                        "name": "u-hermes",
+                        "behind": behind,
+                        "current_sha": uh.get("local_sha") or "",
+                        "latest_sha": uh.get("remote_sha") or "",
+                        "branch": uh.get("branch") or "main",
+                        "repo_url": uh.get("remote_url") or DEFAULT_GITEE_URL,
+                        "compare_url": "",
+                    }
+                    result["webui"] = entry
+                    if include_agent_updates:
+                        # Single repo, so agent tracks the same SHA; clone the
+                        # entry so the frontend's separate agent/webui labels
+                        # don't both point to a shared mutable dict.
+                        result["agent"] = dict(entry, name="agent")
+                    else:
+                        result["agent"] = dict(entry, name="agent", behind=0, ignored=True)
+        except Exception as _uh_err:
+            logger.debug("uhermes update-check fallback failed: %s", _uh_err)
+        return j(handler, result)
 
     if parsed.path == "/api/chat/stream/status":
         stream_id = parse_qs(parsed.query).get("stream_id", [""])[0]
@@ -6712,6 +6746,20 @@ def handle_post(handler, parsed) -> bool:
         target = body.get("target", "")
         if target not in ("webui", "agent"):
             return bad(handler, 'target must be "webui" or "agent"')
+        # In U-Hermes single-repo mode, both targets resolve to the same
+        # parent repo update, so route through update_from_gitee() instead
+        # of api/updates.apply_update (which expects independent webui/agent
+        # checkouts and would otherwise fail).
+        try:
+            from api.uhermes_update import _uhermes_root  # type: ignore
+
+            _root = _uhermes_root()
+            if _root.exists() and (_root / ".git").exists():
+                from api.uhermes_update import update_from_gitee
+
+                return j(handler, update_from_gitee())
+        except Exception as _route_err:
+            logger.debug("uhermes apply routing skipped: %s", _route_err)
         from api.updates import apply_update
 
         return j(handler, apply_update(target))
@@ -6720,6 +6768,16 @@ def handle_post(handler, parsed) -> bool:
         target = body.get("target", "")
         if target not in ("webui", "agent"):
             return bad(handler, 'target must be "webui" or "agent"')
+        try:
+            from api.uhermes_update import _uhermes_root  # type: ignore
+
+            _root = _uhermes_root()
+            if _root.exists() and (_root / ".git").exists():
+                from api.uhermes_update import update_from_gitee
+
+                return j(handler, update_from_gitee())
+        except Exception as _route_err:
+            logger.debug("uhermes force routing skipped: %s", _route_err)
         from api.updates import apply_force_update
 
         return j(handler, apply_force_update(target))
