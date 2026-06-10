@@ -93,9 +93,13 @@ def _run_git(args, cwd, timeout=10):
     surface actionable git error messages instead of empty strings.
     """
     try:
+        # ``-c safe.directory=*`` lets the command succeed when the checkout
+        # lives on a USB filesystem (exFAT/FAT32) that doesn't record
+        # ownership — without it git aborts with "dubious ownership in
+        # repository" and the WebUI's update/version checks silently fail.
         r = subprocess.run(
-            ['git'] + args, cwd=str(cwd), capture_output=True,
-            text=True, timeout=timeout,
+            ['git', '-c', 'safe.directory=*'] + args, cwd=str(cwd),
+            capture_output=True, text=True, timeout=timeout,
         )
         stdout = r.stdout.strip()
         stderr = r.stderr.strip()

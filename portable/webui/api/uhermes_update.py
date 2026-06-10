@@ -96,6 +96,11 @@ def _run_git(args, cwd, *, git_bin: str, timeout: int = 60, no_prompt: bool = Fa
     try:
         env = _git_env(no_prompt=no_prompt)
         run_args = [git_bin]
+        # USB drives (exFAT/FAT32) don't record ownership, so PortableGit
+        # refuses operations on the U-Hermes repo with "dubious ownership in
+        # repository". Bypass per-invocation (no global git config change
+        # needed) so the WebUI's update button works on USB sticks too.
+        run_args += ["-c", "safe.directory=*"]
         if no_prompt:
             # Belt-and-suspenders: also neutralise any configured credential
             # helper for THIS invocation only (does not touch global config).
@@ -342,7 +347,8 @@ def _ls_remote_head(url: str, branch: str, git_bin: str, timeout: int = 15) -> s
     """Return the full 40-char SHA of *branch* on the remote *url*, or ''."""
     try:
         r = subprocess.run(
-            [git_bin, "-c", "credential.helper=", "ls-remote", "--heads", url, branch],
+            [git_bin, "-c", "safe.directory=*", "-c", "credential.helper=",
+             "ls-remote", "--heads", url, branch],
             capture_output=True,
             text=True,
             timeout=timeout,
