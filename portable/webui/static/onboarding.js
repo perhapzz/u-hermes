@@ -370,12 +370,9 @@ function _renderOnboardingBody(){
       <label class="onboarding-field">
         <span>${t('onboarding_workspace_or_path')}</span>
         <input id="onboardingWorkspaceInput" value="${esc(ONBOARDING.form.workspace||'')}" placeholder="${t('onboarding_workspace_placeholder')}" oninput="ONBOARDING.form.workspace=this.value">
-      </label>
-      ${_renderOnboardingModelField()}`;
+      </label>`;
     const wsSel=$('onboardingWorkspaceSelect');
     if(wsSel && ONBOARDING.form.workspace) wsSel.value=ONBOARDING.form.workspace;
-    const modelSel=$('onboardingModelSelect');
-    if(modelSel && ONBOARDING.form.model) modelSel.value=ONBOARDING.form.model;
     return;
   }
 
@@ -426,7 +423,11 @@ function syncOnboardingProvider(value){
   }
   if(provider){
     if(!ONBOARDING.form.model || !_getOnboardingProviderModelChoices().some(m=>m.id===ONBOARDING.form.model) || value==='custom'){
-      ONBOARDING.form.model=provider.default_model||'';
+      // Default to the first selectable model rather than a hardcoded
+      // provider.default_model (e.g. gpt-4o).  The 'custom' provider uses a
+      // free-text input with no choices, so keep its default_model fallback.
+      const choices=_getOnboardingProviderModelChoices();
+      ONBOARDING.form.model=(value!=='custom'&&choices.length&&choices[0].id)||provider.default_model||'';
     }
     if(provider.requires_base_url){
       ONBOARDING.form.baseUrl=ONBOARDING.form.baseUrl||provider.default_base_url||'';
@@ -449,6 +450,12 @@ async function loadOnboardingWizard(){
     ONBOARDING.form.apiKey='';
     if(ONBOARDING.form.provider==='ctrigger'&&status.system&&status.system.prefilled_api_key){ONBOARDING.form.apiKey=status.system.prefilled_api_key;}
     ONBOARDING.form.baseUrl=current.base_url||'';
+    // Default to the first selectable model when none is set or the saved
+    // model isn't among the active provider's choices (avoids forcing gpt-4o).
+    if(ONBOARDING.form.provider!=='custom' && (!ONBOARDING.form.model || !_getOnboardingProviderModelChoices().some(m=>m.id===ONBOARDING.form.model))){
+      const choices=_getOnboardingProviderModelChoices();
+      if(choices.length&&choices[0].id) ONBOARDING.form.model=choices[0].id;
+    }
     ONBOARDING.active=!status.completed;
     if(!ONBOARDING.active) return false;
     $('onboardingOverlay').style.display='flex';
