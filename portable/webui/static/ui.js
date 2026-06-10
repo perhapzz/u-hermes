@@ -1331,18 +1331,21 @@ function _addLiveModelsToSelect(provider, models, sel){
   return added;
 }
 
-async function _fetchLiveModels(provider, sel){
+async function _fetchLiveModels(provider, sel, opts){
   if(!provider||!sel) return;
-  // Already fetched — apply cached models to this select element (#872)
-  if(_liveModelCache[provider]){
+  const force=!!(opts&&opts.force);
+  // Apply cached models unless caller explicitly asked for a fresh fetch.
+  if(!force && _liveModelCache[provider]){
     const added=_addLiveModelsToSelect(provider,_liveModelCache[provider],sel);
     if(added>0 && typeof syncModelChip==='function') syncModelChip();
     return;
   }
+  if(force) delete _liveModelCache[provider];
   _liveModelFetchPending.add(provider);
   try{
     const url=new URL('api/models/live',document.baseURI||location.href);
     url.searchParams.set('provider',provider);
+    if(force) url.searchParams.set('fresh','1');
     const _liveRes=await fetch(url.href,{credentials:'include'});
     if(_redirectIfUnauth(_liveRes)) return;
     const data=await _liveRes.json();
@@ -1351,6 +1354,13 @@ async function _fetchLiveModels(provider, sel){
     const added=_addLiveModelsToSelect(provider,data.models,sel);
     if(added>0){
       if(typeof syncModelChip==='function') syncModelChip();
+      // If the visual dropdown is open, re-render it so the newly fetched
+      // models appear without requiring the user to close and reopen it.
+      const dd=$('composerModelDropdown');
+      if(dd&&dd.classList.contains('open')&&typeof renderModelDropdown==='function'){
+        renderModelDropdown();
+        if(typeof _positionModelDropdown==='function') _positionModelDropdown();
+      }
       console.debug('[hermes] Live models loaded for',provider+':',added,'new models added');
     }
   }catch(e){
@@ -1740,6 +1750,13 @@ async function toggleModelDropdown(){
   chip.classList.add('active');
   const mobileAction=$('composerMobileModelAction');
   if(mobileAction) mobileAction.classList.add('active');
+  // Each open triggers a fresh live-model fetch so newly-added / removed
+  // models on the provider show up without a page reload. force:true bypasses
+  // both the per-page client cache and the 60 s server-side cache.
+  const ap=window._activeProvider||(S.session&&S.session.model_provider)||null;
+  if(ap && typeof _fetchLiveModels==='function'){
+    _fetchLiveModels(ap, sel, {force:true});
+  }
 }
 
 function closeModelDropdown(){

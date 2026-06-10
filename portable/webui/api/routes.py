@@ -8403,6 +8403,10 @@ def _handle_live_models(handler, parsed):
     """
     qs = parse_qs(parsed.query)
     provider = (qs.get("provider", [""])[0] or "").lower().strip()
+    # When the client requests a fresh fetch (e.g. user just opened the model
+    # dropdown), bypass the 60 s server cache so the displayed list reflects
+    # the provider's current `/v1/models` response immediately.
+    fresh = (qs.get("fresh", [""])[0] or "").strip().lower() in ("1", "true", "yes")
 
     try:
         from api.config import get_config as _gc
@@ -8421,9 +8425,10 @@ def _handle_live_models(handler, parsed):
         provider = _resolve_provider_alias(provider)
 
         cache_key = _live_models_cache_key(provider)
-        cached = _get_cached_live_models(cache_key)
-        if cached is not None:
-            return j(handler, cached)
+        if not fresh:
+            cached = _get_cached_live_models(cache_key)
+            if cached is not None:
+                return j(handler, cached)
 
         def _finish(payload: dict):
             _set_cached_live_models(cache_key, payload)
@@ -8529,8 +8534,7 @@ def _handle_live_models(handler, parsed):
                 if _base_url and _api_key:
                     try:
                         import urllib.request
-                        import json
-                        
+
                         # Build the models endpoint URL
                         # AxonHub and similar OpenAI-compat endpoints serve /v1/models
                         _ep = _base_url.rstrip("/")
@@ -8600,12 +8604,92 @@ def _handle_live_models(handler, parsed):
                     logger.debug("Live fetch from %s failed: %s", provider, _fetch_err)
                     # Fall through to static list below
 
+        # ── PROVIDER_REGISTRY (api_key) live fetch fallback ────────────────
+        # Covers any provider registered in hermes_cli.auth.PROVIDER_REGISTRY
+        # with auth_type=="api_key" that isn't in providers/ profiles or
+        # _OPENAI_COMPAT_ENDPOINTS above (e.g. ctrigger). Reads credentials
+        # via resolve_api_key_provider_credentials() so .env-only setups work.
+        # Diagnostic trace is built unconditionally (cheap) and returned in
+        # the JSON when the caller adds ?debug=1.
+        _trace: list[str] = []
+        if not ids:
+            _trace.append(f"enter_fallback provider={provider}")
+            try:
+                try:
+                    from hermes_cli.auth import (
+                        PROVIDER_REGISTRY as _PR,
+                        resolve_api_key_provider_credentials as _rapc,
+                    )
+                    _trace.append("import_ok")
+                except Exception as _ie:
+                    _trace.append(f"import_FAIL {type(_ie).__name__}: {_ie}")
+                    raise
+                _pc = _PR.get(provider)
+                _trace.append(f"PR.get={'hit' if _pc else 'MISS'} keys_count={len(_PR)}")
+                if _pc is not None and getattr(_pc, "auth_type", "") == "api_key":
+                    _trace.append(f"auth_type={_pc.auth_type} base={_pc.inference_base_url}")
+                    try:
+                        _creds = _rapc(provider)
+                        _trace.append(f"creds_ok keys={sorted(_creds.keys())}")
+                    except Exception as _ce:
+                        _trace.append(f"creds_FAIL {type(_ce).__name__}: {_ce}")
+                        _creds = {}
+                    _api_key = str(_creds.get("api_key") or "").strip()
+                    _base_url = (
+                        str(_creds.get("base_url") or "").strip()
+                        or str(getattr(_pc, "inference_base_url", "") or "").strip()
+                    )
+                    _trace.append(f"api_key={'<set>' if _api_key else '<empty>'} base={_base_url or '<empty>'}")
+                    if _api_key and _base_url:
+                        import urllib.request
+                        _ep = _base_url.rstrip("/")
+                        _models_url = (
+                            f"{_ep}/models" if _ep.endswith("/v1")
+                            else f"{_ep}/v1/models"
+                        )
+                        _trace.append(f"GET {_models_url}")
+                        try:
+                            _req = urllib.request.Request(
+                                _models_url,
+                                headers={"Authorization": f"Bearer {_api_key}"},
+                            )
+                            with urllib.request.urlopen(_req, timeout=8) as _resp:
+                                _raw = _resp.read()
+                            _trace.append(f"http_ok bytes={len(_raw)}")
+                            _body = json.loads(_raw)
+                            if isinstance(_body, dict):
+                                _data = _body.get("data", [])
+                                if isinstance(_data, list):
+                                    ids = [m.get("id", "") for m in _data if isinstance(m, dict) and m.get("id")]
+                                    _trace.append(f"parsed n={len(ids)}")
+                                else:
+                                    _trace.append(f"data_not_list type={type(_data).__name__}")
+                            else:
+                                _trace.append(f"body_not_dict type={type(_body).__name__}")
+                            logger.debug(
+                                "PROVIDER_REGISTRY live-fetched %d models from %s",
+                                len(ids), provider,
+                            )
+                        except Exception as _he:
+                            _trace.append(f"http_FAIL {type(_he).__name__}: {_he}")
+                            raise
+            except Exception as _fetch_err:
+                _trace.append(f"OUTER_EXC {type(_fetch_err).__name__}: {_fetch_err}")
+                logger.debug(
+                    "PROVIDER_REGISTRY live fetch failed for %s: %r",
+                    provider, _fetch_err,
+                )
+
         # Static fallback — only reached when live fetch also failed.
         if not ids:
             from api.config import _PROVIDER_MODELS as _pm
             ids = [m["id"] for m in _pm.get(provider, [])]
         if not ids:
-            return _finish({"provider": provider, "models": [], "count": 0})
+            _debug = (qs.get("debug", [""])[0] or "").strip().lower() in ("1", "true", "yes")
+            _payload: dict = {"provider": provider, "models": [], "count": 0}
+            if _debug:
+                _payload["_trace"] = _trace
+            return _finish(_payload)
 
         # For Nous Portal, apply the same featured-set cap that
         # /api/models uses so background enrichment via _fetchLiveModels()
