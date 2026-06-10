@@ -6009,13 +6009,24 @@ async function loadSettingsPanel(){
     // Populate the version badges from the server — keeps them in sync with git
     // tags automatically without any manual release step.
     const webuiBadge = $('settings-webui-version-badge');
-    if(webuiBadge){
-      webuiBadge.textContent = `WebUI: ${settings.webui_version || 'not detected'}`;
-    }
     const agentBadge = $('settings-agent-version-badge');
-    if(agentBadge){
-      const agentVersion = (settings.agent_version || 'not detected').toString().trim() || 'not detected';
-      agentBadge.textContent = `Agent: ${agentVersion}`;
+    const webuiVer = (settings.webui_version || '').toString().trim();
+    const agentVer = (settings.agent_version || '').toString().trim();
+    // U-Hermes vendors webui + agent inside a single git repo, so when both
+    // report the same SHA we collapse the two badges into one "U-Hermes: <sha>"
+    // pill to avoid showing the same value twice in Settings → System.
+    if(webuiVer && agentVer && webuiVer === agentVer){
+      if(webuiBadge) webuiBadge.textContent = `U-Hermes: ${webuiVer}`;
+      if(agentBadge) agentBadge.style.display = 'none';
+    } else {
+      if(webuiBadge){
+        webuiBadge.textContent = `WebUI: ${webuiVer || 'not detected'}`;
+        webuiBadge.style.display = '';
+      }
+      if(agentBadge){
+        agentBadge.textContent = `Agent: ${agentVer || 'not detected'}`;
+        agentBadge.style.display = '';
+      }
     }
     // Hydrate appearance controls first so a slow /api/models request
     // cannot overwrite an in-progress theme/skin selection.
