@@ -31,6 +31,16 @@ macOS:     双击  Mac-Start.command（或在终端运行  bash Mac-Start.comman
 - 启动 Web 服务，监听本地 `127.0.0.1:8787`（不对外开放）
 - 浏览器打开 UI，可以直接开始对话
 
+### 1.3 给 API key 充值
+
+U-Hermes 默认使用 Ctrigger（U-Hermes）服务，首次启动会自动绑定设备并生成专属 API key。余额用完后，可以直接在 Web UI 里充值：
+
+1. 打开 Web UI，进入 **设置（Settings） → 提供商（Providers）**。
+2. 找到 **Ctrigger (U-Hermes)** 这一项，点击 **充值（Recharge）** 按钮。
+3. 浏览器会打开 Ctrigger 充值页，并自动带上你当前的 API key，无需重新登录，按提示完成充值即可。
+
+> **说明**：API key 始终保存在 U 盘本地（`portable/data/.hermes/.env`），充值时只把拼好的网址传给浏览器，key 不会经过第三方。充值完成后余额即时生效，不需要重启服务。如果当前没保存 key，按钮会打开不带 key 的充值页，手动登录后也能充值。
+
 ---
 
 ## 2. U 盘里有什么
