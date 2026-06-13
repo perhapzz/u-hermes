@@ -182,7 +182,7 @@ const LOCALES = {
     workspace_worktree_failed: 'Worktree creation failed: ',
     session_worktree_badge: 'Worktree',
     model_scope_advisory: 'Applies to this conversation from your next message.',
-    model_scope_toast: 'Applies to this conversation from your next message.',
+    model_scope_toast: 'Applies to this conversation, and sets the default model used by the messaging gateway (Weixin/Feishu).',
     // commands.js
     cmd_clear: 'Clear conversation messages',
     cmd_help: 'Show available slash commands',
@@ -7795,7 +7795,7 @@ const LOCALES = {
     session_toolsets_cleared: '工具集已清除 — 使用全局配置',
     session_toolsets_failed: '更新工具集失败：',
     model_scope_advisory: '从下一条消息起应用于当前对话。',
-    model_scope_toast: '从下一条消息起应用于当前对话。',
+    model_scope_toast: '应用于当前对话，并设为消息网关（微信/飞书）使用的默认模型。',
     // commands.js
     cmd_help: '查看可用命令',
     cmd_clear: '清空当前对话消息',

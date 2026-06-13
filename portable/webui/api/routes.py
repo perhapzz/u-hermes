@@ -5755,6 +5755,29 @@ def handle_post(handler, parsed) -> bool:
                     from api.config import _evict_session_agent
 
                     _evict_session_agent(body["session_id"])
+                    # Propagate the inline picker selection to config.yaml so the
+                    # messaging gateway (weixin/feishu) follows the same model.
+                    # The gateway reads config.yaml via an mtime-keyed cache, so
+                    # this takes effect live without a gateway restart. Failure
+                    # here must not break the per-session update.
+                    _inline_model = getattr(s, "model", None)
+                    if _inline_model:
+                        try:
+                            from api.config import (
+                                set_hermes_default_model,
+                                model_with_provider_context,
+                            )
+
+                            set_hermes_default_model(
+                                model_with_provider_context(
+                                    _inline_model, getattr(s, "model_provider", None)
+                                )
+                            )
+                        except Exception:
+                            logger.debug(
+                                "Failed to propagate inline model pick to config.yaml",
+                                exc_info=True,
+                            )
             s.save()
         if str(old_ws or "") != str(new_ws or ""):
             try:
